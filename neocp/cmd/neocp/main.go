@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
@@ -15,13 +14,14 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
-	"math/rand"
+	mrand "math/rand"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"neocp/internal/api"
@@ -35,6 +35,8 @@ var staticFS embed.FS
 var (
 	workspaceDir string
 	sandboxDir   string
+	loginFailures   = make(map[string]int)
+	loginFailuresMu sync.Mutex
 )
 
 func main() {
@@ -111,9 +113,12 @@ func main() {
 	mux.Handle("/api/domains", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomains)))
 	mux.Handle("/api/domains/php", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainPHPChange)))
 	mux.Handle("/api/domains/ssl", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainSSLChange)))
+	mux.Handle("/api/domains/ssl/order", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainSSLOrder)))
 	mux.Handle("/api/domains/settings", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainSettingsChange)))
 	mux.Handle("/api/domains/privacy", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainPrivacyChange)))
 	mux.Handle("/api/domains/redirect", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainRedirectChange)))
+	mux.Handle("/api/domains/dns", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDNSRecords)))
+	mux.Handle("/api/domains/waf", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDomainWAF)))
 
 	// Database endpoints
 	mux.Handle("/api/databases", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabases)))
@@ -144,6 +149,44 @@ func main() {
 	mux.Handle("/api/filemanager/create", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerCreate)))
 	mux.Handle("/api/filemanager/delete", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerDelete)))
 
+	// Docker Container endpoints
+	mux.Handle("/api/docker/containers", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDockerContainers)))
+	mux.Handle("/api/docker/containers/deploy", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDockerDeploy)))
+	mux.Handle("/api/docker/containers/toggle", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDockerToggle)))
+
+	// Firewall & Security blocks
+	mux.Handle("/api/security/firewall/blocks", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallBlocks)))
+	mux.Handle("/api/security/firewall/block", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallBlock)))
+	mux.Handle("/api/security/firewall/unblock", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallUnblock)))
+
+	// Backup Engine endpoints
+	mux.Handle("/api/backup/create", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.HandleBackupCreate(w, r, sandboxDir)
+	})))
+	mux.Handle("/api/backup/list", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.HandleBackupList(w, r, sandboxDir)
+	})))
+	mux.Handle("/api/backup/restore", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.HandleBackupRestore(w, r, sandboxDir)
+	})))
+
+	// Staging endpoints
+	mux.Handle("/api/staging", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.HandleStaging(w, r, sandboxDir)
+	})))
+
+	// Clustering endpoints
+	mux.Handle("/api/cluster/nodes", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
+	mux.Handle("/api/cluster/attach", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
+
+	// Spin secure mTLS Cluster Server on port :8444
+	go func() {
+		log.Println("Starting secure mTLS Cluster Server on port :8444...")
+		if err := api.StartClusterServer(":8444"); err != nil {
+			log.Printf("Cluster mTLS Server failed: %v", err)
+		}
+	}()
+
 	// Spin HTTP-to-HTTPS dev redirects and secure servers
 	go func() {
 		log.Println("Starting HTTP Dev server on http://localhost:8080...")
@@ -168,10 +211,39 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+func getClientIP(r *http.Request) string {
+	for _, h := range []string{"X-Forwarded-For", "X-Real-IP"} {
+		addresses := r.Header.Get(h)
+		if addresses != "" {
+			parts := strings.Split(addresses, ",")
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	ip := getClientIP(r)
+	db := core.GetDB()
+
+	// Check if already blocked in the database
+	blocks := db.GetFirewallBlocks()
+	for _, b := range blocks {
+		if b.IP == ip {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error":"Access Denied: IP blocked by cPHulk intrusion prevention system."}`))
+			return
+		}
 	}
 
 	var req LoginRequest
@@ -180,14 +252,48 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := core.GetDB()
 	acc, err := db.Authenticate(req.Username, req.Password)
 	if err != nil {
+		loginFailuresMu.Lock()
+		loginFailures[ip]++
+		failures := loginFailures[ip]
+		loginFailuresMu.Unlock()
+
+		log.Printf("[cPHulkTelemetry] Login failure from %s. Attempts: %d/5", ip, failures)
+
+		if failures >= 5 {
+			log.Printf("[cPHulkTelemetry] IP %s triggered cPHulk brute force block threshold. Block initiated.", ip)
+			db.BlockIP(ip, "cPHulk: Too many failed login attempts")
+
+			// Call OS block command securely
+			execEngine := &oslayer.SafeCommandExec{}
+			var fireErr error
+			if runtime.GOOS == "windows" {
+				ruleName := "NeoCP-Block-IP-" + ip
+				args := []string{
+					"advfirewall", "firewall", "add", "rule",
+					"name=" + ruleName, "dir=in", "action=block", "remoteip=" + ip,
+				}
+				_, fireErr = execEngine.Execute(r.Context(), "netsh", args, 3*time.Second)
+			} else {
+				args := []string{"-A", "INPUT", "-s", ip, "-j", "DROP"}
+				_, fireErr = execEngine.Execute(r.Context(), "iptables", args, 3*time.Second)
+			}
+			if fireErr != nil {
+				log.Printf("[cPHulkTelemetry] Active OS Firewall block for %s failed: %v", ip, fireErr)
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error":"invalid username or password credentials"}`))
 		return
 	}
+
+	// Login succeeded, reset failures
+	loginFailuresMu.Lock()
+	delete(loginFailures, ip)
+	loginFailuresMu.Unlock()
 
 	// Generate standard HMAC session JWT (24h)
 	token, err := api.GenerateToken(acc.Username, acc.Role, 24*time.Hour)
@@ -249,6 +355,30 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 		dom.SSLActive = false
 		dom.CreatedAt = time.Now()
 
+		// Gate against Reseller Package or Account limits
+		acc, accErr := db.GetAccount(username)
+		if accErr == nil {
+			// Direct Account limit check
+			if acc.DomainsLimit > 0 && acc.DomainsUsed >= acc.DomainsLimit {
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: account domain limit reached (%d domains limit)", acc.DomainsLimit)})
+				return
+			}
+			// Reseller Package limit check
+			packages := db.GetPackages()
+			for _, pkg := range packages {
+				if pkg.Name == acc.Plan {
+					currentDoms := len(db.GetDomains(username, false))
+					if pkg.DomainsLimit > 0 && currentDoms >= pkg.DomainsLimit {
+						w.WriteHeader(http.StatusForbidden)
+						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package domains limit reached (%d limit)", pkg.DomainsLimit)})
+						return
+					}
+					break
+				}
+			}
+		}
+
 		err := db.CreateDomain(dom)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -260,6 +390,13 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 		dirPath := filepath.Join(sandboxDir, username, "public_html", dom.DomainName)
 		os.MkdirAll(dirPath, 0755)
 		ioutil.WriteFile(filepath.Join(dirPath, "index.php"), []byte("<h1>Welcome to your new website space: "+dom.DomainName+"</h1>"), 0644)
+
+		// Regenerate Nginx configuration
+		_, err = oslayer.GenerateNginxConfig(dom.DomainName, username, dom.PHPVersion, dom.GzipEnabled, dom.BrotliEnabled, dom.SSLActive, workspaceDir)
+		if err == nil {
+			reg := oslayer.GetServiceRegistry()
+			_ = reg.RestartService("web")
+		}
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(dom)
@@ -294,6 +431,11 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Delete Nginx configuration
+		_ = oslayer.RemoveNginxConfig(domName, workspaceDir)
+		reg := oslayer.GetServiceRegistry()
+		_ = reg.RestartService("web")
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"success":true}`))
 		return
@@ -324,6 +466,22 @@ func handleDomainPHPChange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Regenerate Nginx config and reload
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+	domains := db.GetDomains(username, isAdmin)
+	for _, d := range domains {
+		if d.DomainName == req.DomainName {
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			if err == nil {
+				reg := oslayer.GetServiceRegistry()
+				_ = reg.RestartService("web")
+			}
+			break
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"success":true}`))
 }
@@ -351,8 +509,90 @@ func handleDomainSSLChange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Regenerate Nginx config and reload
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+	domains := db.GetDomains(username, isAdmin)
+	for _, d := range domains {
+		if d.DomainName == req.DomainName {
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			if err == nil {
+				reg := oslayer.GetServiceRegistry()
+				_ = reg.RestartService("web")
+			}
+			break
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"success":true}`))
+}
+
+func handleDomainSSLOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DomainName string `json:"domain_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	username := r.Header.Get("NeoCP-User")
+
+	// Call ACME client to provision Let's Encrypt certificates
+	acme := api.NewACMEClient(workspaceDir, sandboxDir)
+	logs, err := acme.ProvisionCertificate(req.DomainName, username, true)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"logs":    logs,
+		})
+		return
+	}
+
+	db := core.GetDB()
+	err = db.UpdateDomainSSL(req.DomainName, true, "Let's Encrypt Authority X3")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"logs":    logs,
+		})
+		return
+	}
+
+	// Regenerate Nginx config with SSL enabled
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+	domains := db.GetDomains(username, isAdmin)
+	for _, d := range domains {
+		if d.DomainName == req.DomainName {
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, true, workspaceDir)
+			if err == nil {
+				reg := oslayer.GetServiceRegistry()
+				_ = reg.RestartService("web")
+			}
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"logs":    logs,
+	})
 }
 
 func handleDomainSettingsChange(w http.ResponseWriter, r *http.Request) {
@@ -376,6 +616,22 @@ func handleDomainSettingsChange(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Regenerate Nginx config and reload
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+	domains := db.GetDomains(username, isAdmin)
+	for _, d := range domains {
+		if d.DomainName == req.DomainName {
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			if err == nil {
+				reg := oslayer.GetServiceRegistry()
+				_ = reg.RestartService("web")
+			}
+			break
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -457,6 +713,23 @@ func handleDatabases(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Owner = username
 		d.CreatedAt = time.Now()
+
+		// Gate against Reseller Package limits
+		acc, accErr := db.GetAccount(username)
+		if accErr == nil {
+			packages := db.GetPackages()
+			for _, pkg := range packages {
+				if pkg.Name == acc.Plan {
+					currentDBs := len(db.GetDatabases(username, false))
+					if pkg.DatabasesLimit > 0 && currentDBs >= pkg.DatabasesLimit {
+						w.WriteHeader(http.StatusForbidden)
+						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package databases limit reached (%d limit)", pkg.DatabasesLimit)})
+						return
+					}
+					break
+				}
+			}
+		}
 
 		err := db.CreateDatabase(d)
 		if err != nil {
@@ -665,7 +938,7 @@ func handleMigrations(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		task.ID = fmt.Sprintf("mig_%d", rand.Intn(9000)+1000)
+		task.ID = fmt.Sprintf("mig_%d", mrand.Intn(9000)+1000)
 		task.Owner = username
 		task.Status = "handshaking"
 		task.ProgressPct = 0
@@ -863,6 +1136,16 @@ func handleFileManagerWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	err = db.CheckQuota(username, sandboxDir, int64(len(req.Content)))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
 	err = ioutil.WriteFile(phys, []byte(req.Content), 0644)
 	if err != nil {
 		http.Error(w, "Write failed", http.StatusInternalServerError)
@@ -893,6 +1176,16 @@ func handleFileManagerCreate(w http.ResponseWriter, r *http.Request) {
 	phys, err := virtualToPhysical(req.Path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	err = db.CheckQuota(username, sandboxDir, 0)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 

@@ -1,1 +1,0 @@
-<h1>Welcome to your new website space: app-67.patelcloud.net</h1>

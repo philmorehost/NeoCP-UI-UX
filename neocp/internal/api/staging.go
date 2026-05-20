@@ -19,9 +19,8 @@ type StagingPushRequest struct {
 }
 
 // HandleStaging manages 1-Click Staging actions
-func HandleStaging(w http.ResponseWriter, r *http.Request) {
+func HandleStaging(w http.ResponseWriter, r *http.Request, sandboxDir string) {
 	username := r.Header.Get("NeoCP-User")
-	sandboxDir := "sandbox" // Standard sandbox directory
 
 	w.Header().Set("Content-Type", "application/json")
 

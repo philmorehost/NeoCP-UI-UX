@@ -37,14 +37,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     async function triggerTenantAuthentication(role) {
         let username = 'patel';
-        if (role === 'admin') username = 'admin';
-        if (role === 'reseller') username = 'reseller1';
+        let password = 'patel123';
+        if (role === 'admin') {
+            username = 'admin';
+            password = 'admin123';
+        }
+        if (role === 'reseller') {
+            username = 'reseller1';
+            password = 'reseller123';
+        }
 
         try {
             const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password: 'password' })
+                body: JSON.stringify({ username, password })
             });
             const data = await res.json();
             if (data.token) {
@@ -81,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadDockerContainers();
                 loadMigrationTasks();
                 loadOSServicesList();
+                loadClusterNodes();
                 
                 // Show role-specific warnings/elements
                 enforceRoleCapabilities();
@@ -151,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
+        if (targetViewId === 'clustering') loadClusterNodes();
         if (targetViewId === 'security') {
             loadFirewallBlocks();
             loadDomainsTable();
@@ -1535,32 +1544,66 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // 12. MASTER STAGING & CLUSTERING ORCHESTRATION
     // ==========================================================================
-    document.getElementById('generate-staging-btn').addEventListener('click', () => {
-        const prod = document.getElementById('staging-prod-select').value;
-        const sub = document.getElementById('staging-subdomain-input').value;
+    async function loadClusterNodes() {
+        const container = document.getElementById('cluster-nodes-container');
+        if (!container) return;
+        container.innerHTML = '<div class="text-muted">Loading cluster topology...</div>';
+        try {
+            const res = await fetch('/api/cluster/nodes', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const nodes = await res.json();
+            container.innerHTML = '';
+            if (nodes.length === 0) {
+                container.innerHTML = '<div class="text-muted">No remote nodes attached.</div>';
+                return;
+            }
+            nodes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'cluster-node-row glass';
+                div.style.marginBottom = '10px';
+                div.style.padding = '15px';
+                div.innerHTML = `
+                    <div class="node-meta">
+                        <h6 style="margin:0; font-family:var(--font-mono); color:var(--accent-blue);">🖥️ ${n.node_id} [${n.ip}]</h6>
+                        <span class="node-role-tag">${n.role.toUpperCase()} NODE</span>
+                        <div style="margin-top:8px; display:flex; gap:15px;">
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:4px;">
+                                    <span>CPU Load</span>
+                                    <span>${n.cpu_load.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar-container" style="height:4px;">
+                                    <div class="progress-fill fill-blue" style="width:${n.cpu_load}%"></div>
+                                </div>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:4px;">
+                                    <span>RAM Load</span>
+                                    <span>${n.ram_load.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar-container" style="height:4px;">
+                                    <div class="progress-fill fill-green" style="width:${n.ram_load}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="status-badge ${n.is_active ? 'badge-green' : 'badge-red'}">${n.is_active ? 'ONLINE' : 'OFFLINE'}</span>
+                        <div style="font-size:9px; color:var(--text-inactive); margin-top:5px;">Last Ping: ${new Date(n.last_ping).toLocaleTimeString()}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="text-red">Failed to load cluster.</div>';
+        }
+    }
 
-        addTaskIndicator();
-        showNotification(`Cloning production filesystem & databases for sandbox workspace staging...`, 'info');
-        setTimeout(() => {
-            removeTaskIndicator();
-            showNotification(`Sandbox successfully provisioned at ${sub}.${prod}. Live testing is enabled.`, 'success');
-            loadDomainsTable();
-        }, 1500);
-    });
-
-    document.getElementById('push-staging-btn').addEventListener('click', () => {
-        addTaskIndicator();
-        showNotification('Initiating production delta-sync push. Compiling changes...', 'info');
-        setTimeout(() => {
-            removeTaskIndicator();
-            showNotification('Staging pushed to primary production hub with zero file disruptions.', 'success');
-        }, 1200);
-    });
-
-    const clusterContainer = document.getElementById('cluster-nodes-container');
-    document.getElementById('attach-node-btn').addEventListener('click', () => {
+    async function attachNode() {
         const ip = document.getElementById('cluster-node-ip').value;
         const role = document.getElementById('cluster-node-role').value;
+        const nodeID = `vps-${Math.floor(Math.random()*900)+100}`;
 
         if (!ip) {
             showNotification('Enter a valid worker cluster address.', 'error');
@@ -1568,22 +1611,140 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         addTaskIndicator();
-        setTimeout(() => {
+        showNotification(`Registering node ${nodeID} and generating mTLS certificates...`, 'info');
+        try {
+            const res = await fetch('/api/cluster/attach', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ node_id: nodeID, ip, role })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Node ${nodeID} attached! PKCS#8 certificates generated for secure gRPC stream.`, 'success');
+                loadClusterNodes();
+            } else {
+                showNotification(data.error || 'Failed to attach node.', 'error');
+            }
+        } catch (e) {
+            showNotification('Cluster API connection failure.', 'error');
+        } finally {
             removeTaskIndicator();
-            const div = document.createElement('div');
-            div.className = 'stat-row';
-            div.style.background = 'rgba(255,255,255,0.02)';
-            div.style.padding = '10px';
-            div.style.borderRadius = '6px';
-            div.style.marginBottom = '8px';
-            div.innerHTML = `
-                <span>🖥️ VPS [${ip}]</span>
-                <span class="status-badge badge-green">${role.toUpperCase()} Cluster</span>
-            `;
-            clusterContainer.appendChild(div);
-            showNotification('VPS connected and distributed service sync configured!', 'success');
-        }, 1000);
+        }
+    }
+
+    async function cloneStaging(productionDomain, stagingSubdomain) {
+        addTaskIndicator();
+        showNotification(`Cloning production filesystem & databases for ${productionDomain}...`, 'info');
+
+        // Visual progress ticker simulation
+        let step = 0;
+        const steps = [
+            "Replicating directory structures...",
+            "Cloning database schemas...",
+            "Recalculating PHP serialized string lengths...",
+            "Injecting staging Nginx virtual hosts..."
+        ];
+        const ticker = setInterval(() => {
+            if (step < steps.length) {
+                showNotification(steps[step], 'info');
+                step++;
+            } else {
+                clearInterval(ticker);
+            }
+        }, 800);
+
+        try {
+            const res = await fetch('/api/staging?action=clone', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ production_domain: productionDomain, staging_subdomain: stagingSubdomain })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Sandbox successfully provisioned at ${stagingSubdomain}. Live testing is enabled.`, 'success');
+                loadDomainsTable();
+                loadDashboardSummaries();
+            } else {
+                showNotification(data.error || 'Cloning failed.', 'error');
+            }
+        } catch (e) {
+            showNotification('Staging API failure.', 'error');
+        } finally {
+            clearInterval(ticker);
+            removeTaskIndicator();
+        }
+    }
+
+    async function pushStaging(stagingSubdomain, syncMode) {
+        addTaskIndicator();
+        showNotification('Initiating production delta-sync push. Compiling changes...', 'info');
+
+        try {
+            const res = await fetch('/api/staging?action=push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ staging_subdomain: stagingSubdomain, sync_mode: syncMode })
+            });
+            if (res.ok) {
+                showNotification('Staging pushed to primary production hub with zero file disruptions.', 'success');
+                loadDomainsTable();
+            } else {
+                const data = await res.json();
+                showNotification(data.error || 'Push failed.', 'error');
+            }
+        } catch (e) {
+            showNotification('Staging Push API failure.', 'error');
+        } finally {
+            removeTaskIndicator();
+        }
+    }
+
+    async function deleteStaging(subdomain) {
+        addTaskIndicator();
+        try {
+            const res = await fetch(`/api/staging?subdomain=${encodeURIComponent(subdomain)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            if (res.ok) {
+                showNotification('Staging sandbox environment wiped successfully.', 'success');
+                loadDomainsTable();
+                loadDashboardSummaries();
+            }
+        } catch (e) {
+            showNotification('Error destroying sandbox.', 'error');
+        } finally {
+            removeTaskIndicator();
+        }
+    }
+
+    document.getElementById('generate-staging-btn').addEventListener('click', () => {
+        const prod = document.getElementById('staging-prod-select').value;
+        const sub = document.getElementById('staging-subdomain-input').value;
+        cloneStaging(prod, sub);
     });
+
+    document.getElementById('push-staging-btn').addEventListener('click', () => {
+        // Find an active staging domain to push (just a helper for the generic button)
+        const stagingDom = cachedDomains.find(d => d.domain_name.includes('-stage') || d.domain_name.startsWith('staging.'));
+        if (!stagingDom) {
+            showNotification('No active staging domain found to push.', 'error');
+            return;
+        }
+        const syncMode = document.getElementById('staging-sync-mode').value;
+        pushStaging(stagingDom.domain_name, syncMode);
+    });
+
+    document.getElementById('attach-node-btn').addEventListener('click', attachNode);
 
     // ==========================================================================
     // 13. WHM RESOURCE PACKAGE PROVISIONER
@@ -2806,12 +2967,108 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================================================
-    // 21. INITIALIZATION BOOTSTRAP
+    // 21. LOGIN & INITIALIZATION BOOTSTRAP
     // ==========================================================================
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginSubmitBtn = document.getElementById('login-submit-btn');
+    const loginError = document.getElementById('login-error');
+    const mainAppContainer = document.getElementById('main-app-container');
+
+    async function performLogin() {
+        const username = loginUsernameInput.value.trim();
+        const password = loginPasswordInput.value.trim();
+
+        if (!username || !password) {
+            loginError.textContent = "Please enter both username and password.";
+            loginError.style.display = "block";
+            return;
+        }
+
+        loginSubmitBtn.disabled = true;
+        loginSubmitBtn.textContent = "Authenticating...";
+        loginError.style.display = "none";
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.token) {
+                // Set cookie & localStorage session
+                document.cookie = `neocp_auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+                localStorage.setItem('neocp_token', data.token);
+                currentUser = username;
+                currentRole = data.role;
+
+                // Adjust Profile display
+                profileRole.textContent = currentRole.toUpperCase();
+                if (currentRole === 'admin') {
+                    profileName.textContent = 'Root System Administrator';
+                    document.getElementById('footer-host-os').textContent = 'Linux / Windows Master';
+                    userRoleSelect.value = 'admin';
+                } else if (currentRole === 'reseller') {
+                    profileName.textContent = 'Enterprise Reseller';
+                    document.getElementById('footer-host-os').textContent = 'WHM Node Reseller';
+                    userRoleSelect.value = 'reseller';
+                } else {
+                    profileName.textContent = username.charAt(0).toUpperCase() + username.slice(1);
+                    document.getElementById('footer-host-os').textContent = 'cPanel Cloud Container';
+                    userRoleSelect.value = 'customer';
+                }
+
+                // Adjust default home folders in sandbox
+                currentPath = `/home/${currentUser}/public_html`;
+
+                // Refresh all models
+                loadDashboardSummaries();
+                loadDomainsTable();
+                loadFileExplorer();
+                loadDatabasesTable();
+                loadCronJobs();
+                loadPackagesTable();
+                loadSupportTickets();
+                loadDockerContainers();
+                loadMigrationTasks();
+                loadOSServicesList();
+                loadClusterNodes();
+
+                // Show role-specific warnings/elements
+                enforceRoleCapabilities();
+
+                // Hide login, show app
+                loginOverlay.classList.remove('active');
+                loginOverlay.style.display = 'none';
+                mainAppContainer.style.display = 'grid';
+                document.body.classList.remove('login-state');
+
+                showNotification(`Welcome back, ${username}! Dashboard initialized.`, 'success');
+                connectTelemetryWebSocket();
+            } else {
+                loginError.textContent = data.error || "Access Denied: Invalid credentials.";
+                loginError.style.display = "block";
+            }
+        } catch (err) {
+            console.error('Session login failure:', err);
+            loginError.textContent = "Server connection handshake failed.";
+            loginError.style.display = "block";
+        } finally {
+            loginSubmitBtn.disabled = false;
+            loginSubmitBtn.textContent = "Authenticate & Enter Dashboard";
+        }
+    }
+
+    loginSubmitBtn.addEventListener('click', performLogin);
+    loginPasswordInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performLogin();
+    });
+
     async function boot() {
-        // Enforce default cookies
-        await triggerTenantAuthentication('customer');
-        connectTelemetryWebSocket();
+        // Just show the login page by default
+        console.log("NeoCP Core Ready. Awaiting authentication...");
     }
 
     boot();

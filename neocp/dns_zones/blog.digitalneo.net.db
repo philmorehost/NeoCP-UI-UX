@@ -1,5 +1,5 @@
 ; BIND9 Zone File for blog.digitalneo.net (Compiled by NeoCP Core Engine)
-; Compiled At: Wed, 20 May 2026 13:27:45 WAT
+; Compiled At: Wed, 20 May 2026 18:21:22 UTC
 
 $TTL 86400
 @   IN  SOA  ns1.neocp.io. admin.neocp.io. (

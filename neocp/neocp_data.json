@@ -2,7 +2,7 @@
   "accounts": {
     "admin": {
       "username": "admin",
-      "password": "password",
+      "password": "admin123",
       "role": "admin",
       "plan": "Unlimited System Plan",
       "email": "admin@neocp.io",
@@ -10,27 +10,27 @@
       "disk_limit": 0,
       "bandwidth_used": 45,
       "bandwidth_limit": 0,
-      "domains_used": 3,
+      "domains_used": 1,
       "domains_limit": 0,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-20T18:00:00Z"
     },
     "patel": {
       "username": "patel",
-      "password": "password",
+      "password": "patel123",
       "role": "customer",
       "plan": "Standard Hosting Plan",
       "email": "a.patel@digitalneo.net",
-      "disk_used": 2,
+      "disk_used": 120,
       "disk_limit": 5000,
       "bandwidth_used": 4,
       "bandwidth_limit": 100,
       "domains_used": 2,
       "domains_limit": 10,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-20T18:00:00Z"
     },
     "reseller1": {
       "username": "reseller1",
-      "password": "password",
+      "password": "reseller123",
       "role": "reseller",
       "plan": "Gold Reseller Pack",
       "email": "reseller@neocp.io",
@@ -38,23 +38,23 @@
       "disk_limit": 50000,
       "bandwidth_used": 15,
       "bandwidth_limit": 2000,
-      "domains_used": 2,
+      "domains_used": 1,
       "domains_limit": 50,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-20T18:00:00Z"
     }
   },
   "domains": {
-    "afan.pmhserver.name.ng": {
-      "domain_name": "afan.pmhserver.name.ng",
-      "owner": "admin",
+    "blog-stage.digitalneo.net": {
+      "domain_name": "blog-stage.digitalneo.net",
+      "owner": "patel",
       "php_version": "8.2",
       "directory_privacy": false,
       "directory_privacy_user": "",
       "directory_privacy_pass": "",
       "redirect_url": "",
       "ssl_active": true,
-      "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "0001-01-01T00:00:00Z",
+      "ssl_issuer": "NeoCP Staging Authority",
+      "ssl_expires": "2026-08-20T18:47:45.701285049Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -67,32 +67,7 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-20T08:35:36.931485+01:00"
-    },
-    "app-67.patelcloud.net": {
-      "domain_name": "app-67.patelcloud.net",
-      "owner": "reseller1",
-      "php_version": "8.2",
-      "directory_privacy": false,
-      "directory_privacy_user": "",
-      "directory_privacy_pass": "",
-      "redirect_url": "",
-      "ssl_active": false,
-      "ssl_issuer": "",
-      "ssl_expires": "0001-01-01T00:00:00Z",
-      "webdav_enabled": false,
-      "hotlink_protected": false,
-      "leech_protected": false,
-      "gzip_enabled": true,
-      "brotli_enabled": false,
-      "dns_records": null,
-      "waf_policy": {
-        "sqli_shield": false,
-        "xss_block": false,
-        "lfi_shield": false,
-        "csrf_header": false
-      },
-      "created_at": "2026-05-20T11:44:16.4791129+01:00"
+      "created_at": "2026-05-20T18:47:45.701286302Z"
     },
     "blog.digitalneo.net": {
       "domain_name": "blog.digitalneo.net",
@@ -104,7 +79,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-20T10:08:31.9382532+01:00",
+      "ssl_expires": "2026-08-04T18:00:00Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -117,42 +92,25 @@
         "lfi_shield": true,
         "csrf_header": true
       },
-      "created_at": "2026-04-20T08:31:21.3693801+01:00"
-    },
-    "shop.digitalneo.net": {
-      "domain_name": "shop.digitalneo.net",
-      "owner": "patel",
-      "php_version": "8.3",
-      "directory_privacy": false,
-      "directory_privacy_user": "",
-      "directory_privacy_pass": "",
-      "redirect_url": "",
-      "ssl_active": true,
-      "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-07-18T08:31:21.3693801+01:00",
-      "webdav_enabled": true,
-      "hotlink_protected": false,
-      "leech_protected": false,
-      "gzip_enabled": true,
-      "brotli_enabled": false,
-      "dns_records": null,
-      "waf_policy": {
-        "sqli_shield": false,
-        "xss_block": false,
-        "lfi_shield": false,
-        "csrf_header": false
-      },
-      "created_at": "2026-05-10T08:31:21.3693801+01:00"
+      "created_at": "2026-04-20T18:00:00Z"
     }
   },
   "databases": {
+    "patel_staging_wpblog": {
+      "name": "patel_staging_wpblog",
+      "owner": "patel",
+      "db_user": "patel_wpuser_stage",
+      "password": "dbpassword123",
+      "remote_ips": "%",
+      "created_at": "2026-05-20T18:47:45.700570879Z"
+    },
     "patel_wpblog": {
       "name": "patel_wpblog",
       "owner": "patel",
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-20T18:00:00Z"
     }
   },
   "cron_jobs": {
@@ -163,30 +121,10 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-20T18:47:45.180222072Z"
     }
   },
   "reseller_packages": {
-    "Enterprise-Cluster": {
-      "name": "Enterprise-Cluster",
-      "disk_limit": 50000,
-      "bandwidth_limit": 1000,
-      "domains_limit": 100,
-      "databases_limit": 250,
-      "lve_cpu_pct": 100,
-      "lve_ram_mb": 2048,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
-    },
-    "Premium-Personal": {
-      "name": "Premium-Personal",
-      "disk_limit": 2000,
-      "bandwidth_limit": 50,
-      "domains_limit": 3,
-      "databases_limit": 5,
-      "lve_cpu_pct": 50,
-      "lve_ram_mb": 512,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
-    },
     "Standard Hosting Plan": {
       "name": "Standard Hosting Plan",
       "disk_limit": 5000,
@@ -195,7 +133,7 @@
       "databases_limit": 1,
       "lve_cpu_pct": 50,
       "lve_ram_mb": 512,
-      "created_at": "2026-05-20T13:27:45.6870569+01:00"
+      "created_at": "2026-05-20T18:00:00Z"
     }
   },
   "tickets": {
@@ -209,39 +147,38 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-20T06:31:21.3693801+01:00"
+          "timestamp": "2026-05-20T16:47:45.180222615Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-20T07:31:21.3693801+01:00"
+          "timestamp": "2026-05-20T17:47:45.180223004Z"
         }
       ],
-      "created_at": "2026-05-20T06:31:21.3693801+01:00"
+      "created_at": "2026-05-20T16:47:45.180223106Z"
     }
   },
   "docker_containers": {},
-  "migration_tasks": {
-    "mig_8537": {
-      "id": "mig_8537",
-      "owner": "admin",
-      "panel_type": "cpanel",
-      "hostname": "173.208.213.194",
-      "target_domain": "afan.pmhserver.name.ng",
-      "status": "complete",
-      "progress_pct": 100,
-      "logs": [
-        "[UZME] Initializing synchronization worker thread...",
-        "[UZME] Secure API handshake established. Scanning target filesystems and MySQL databases...",
-        "[UZME] Packaging 18,242 files into tar archive at source location...",
-        "[UZME] Downloading public_html tar file block... [====================\u003e] 100% (24.1 MB)",
-        "[UZME] Sync complete. Unpacking directory nodes safely into local customer workspace sandbox...",
-        "[UZME] Migrating database patel_wpblog schemas. Injecting whitelists...",
-        "[UZME] Pipeline complete. Launching dynamic reverse-proxy cutover map on port 80...",
-        "[UZME] Migration completed successfully! DNS cutover stage fully functional."
-      ],
-      "created_at": "2026-05-20T08:35:26.3556211+01:00"
+  "migration_tasks": {},
+  "firewall_blocks": {},
+  "cluster_nodes": {
+    "test-worker-01": {
+      "node_id": "test-worker-01",
+      "ip": "127.0.0.1",
+      "role": "web",
+      "is_active": false,
+      "cpu_load": 12.5,
+      "ram_load": 45.2,
+      "last_ping": "2026-05-20T18:47:45.192500305Z"
+    },
+    "vps-443": {
+      "node_id": "vps-443",
+      "ip": "1.2.3.4",
+      "role": "db",
+      "is_active": false,
+      "cpu_load": 0,
+      "ram_load": 0,
+      "last_ping": "2026-05-20T19:11:49.341550898Z"
     }
-  },
-  "firewall_blocks": {}
+  }
 }

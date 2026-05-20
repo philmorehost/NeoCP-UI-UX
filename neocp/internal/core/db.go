@@ -257,7 +257,7 @@ func (db *DatabaseEngine) seedDefaultData() {
 	if _, exists := db.store.Accounts["admin"]; !exists {
 		db.store.Accounts["admin"] = Account{
 			Username:       "admin",
-			Password:       "password", // In production this would be hashed. Keep plain text for easy visual testing of custom dashboard.
+			Password:       "admin123", // In production this would be hashed. Keep plain text for easy visual testing of custom dashboard.
 			Role:           "admin",
 			Plan:           "Unlimited System Plan",
 			Email:          "admin@neocp.io",
@@ -275,7 +275,7 @@ func (db *DatabaseEngine) seedDefaultData() {
 	if _, exists := db.store.Accounts["reseller1"]; !exists {
 		db.store.Accounts["reseller1"] = Account{
 			Username:       "reseller1",
-			Password:       "password",
+			Password:       "reseller123",
 			Role:           "reseller",
 			Plan:           "Gold Reseller Pack",
 			Email:          "reseller@neocp.io",
@@ -293,7 +293,7 @@ func (db *DatabaseEngine) seedDefaultData() {
 	if _, exists := db.store.Accounts["patel"]; !exists {
 		db.store.Accounts["patel"] = Account{
 			Username:       "patel",
-			Password:       "password",
+			Password:       "patel123",
 			Role:           "customer",
 			Plan:           "Standard Hosting Plan",
 			Email:          "a.patel@digitalneo.net",
