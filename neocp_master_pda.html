@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoCP Professional - Ultimate Master Program Design Architecture (PDA) v5</title>
+    <style>
+        :root {
+            --bg-main: #090f19;
+            --bg-sidebar: #111827;
+            --bg-card: #1f2937;
+            --bg-code: #030712;
+            --accent-blue: #38bdf8;
+            --accent-green: #34d399;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-ui: #374151;
+            --font-stack: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-stack);
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1500px; margin: 0 auto; }
+        header {
+            border-bottom: 3px solid var(--border-ui);
+            padding-bottom: 35px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        header h1 { font-size: 3.2rem; color: var(--accent-blue); font-weight: 800; letter-spacing: -0.03em; }
+        header p { color: var(--text-muted); font-size: 1.2rem; margin-top: 5px; }
+        
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .meta-card {
+            background-color: var(--bg-sidebar);
+            border: 1px solid var(--border-ui);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .meta-card strong { color: var(--accent-green); }
+
+        h2 {
+            font-size: 2.2rem;
+            color: var(--accent-blue);
+            margin-top: 55px;
+            margin-bottom: 25px;
+            border-left: 6px solid var(--accent-orange);
+            padding-left: 18px;
+            font-weight: 700;
+        }
+        h3 { font-size: 1.5rem; color: var(--accent-green); margin-top: 35px; margin-bottom: 15px; font-weight: 600; }
+        p { margin-bottom: 18px; color: #cbd5e1; font-size: 1.05rem; }
+        ul { margin-bottom: 22px; margin-left: 25px; color: #cbd5e1; }
+        li { margin-bottom: 10px; }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-code);
+            padding: 3px 7px;
+            border-radius: 5px;
+            color: var(--accent-blue);
+            font-size: 0.95em;
+        }
+        pre {
+            background-color: var(--bg-code);
+            border: 1px solid var(--border-ui);
+            padding: 22px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin-bottom: 30px;
+        }
+        pre code { color: #e2e8f0; background: none; padding: 0; font-size: 0.9rem; }
+
+        .ui-spec-card {
+            background-color: var(--bg-sidebar);
+            border: 1px solid var(--border-ui);
+            border-top: 4px solid var(--accent-blue);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 35px;
+        }
+        .ui-spec-card.next-gen {
+            border-top: 4px solid var(--accent-purple);
+            background-color: #1a1625;
+        }
+        .layout-blueprint {
+            background-color: var(--bg-code);
+            border: 1px dashed var(--accent-blue);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            color: #e2e8f0;
+            margin: 20px 0;
+            line-height: 1.4;
+        }
+        .feature-subgrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .feature-subcard {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-ui);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .feature-subcard h4 { color: #fff; margin-bottom: 10px; font-size: 1.15rem; display: flex; justify-content: space-between; align-items: center; }
+        .badge { background: #374151; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--accent-blue); }
+        .badge.active { background: rgba(52, 211, 153, 0.1); color: var(--accent-green); }
+        .badge.advanced { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>NeoCP Professional — Ultimate Program Design Architecture (PDA)</h1>
+        <p>Complete Production Blueprint incorporating Next-Gen Migration, Containerization, and HA Clustering</p>
+        <div class="meta-grid">
+            <div class="meta-card"><strong>UI Style Schema:</strong> Premium Dark Obsidian Chrome / Modern Steel Sidebar Layout</div>
+            <div class="meta-card"><strong>Core Implementation Layer:</strong> Native Cross-Platform Go Monolithic Executable Daemon</div>
+            <div class="meta-card"><strong>Data Synch Engine:</strong> Stateless REST Endpoints + Live Asynchronous Bi-Directional WebSockets</div>
+        </div>
+    </header>
+
+    <h2>1. Global Master UI/UX Canvas Layout</h2>
+    <div class="ui-spec-card">
+        <h3>1.1 Structural Layout Blueprint Matrix</h3>
+        <div class="layout-blueprint">+---------------------------------------------------------------------------------------------------+
+|  [NEOCP PROFESSIONAL LOGO]       Top Header Status Bar: Profile Map (A. Patel) / Active Tasks Check / Search Box  |
++-----------------------------------+---------------------------------------------------------------+
+|  SIDE NAVIGATION CONTROLS         |  MAIN CONTENT VIEWPORT ENGINE                                  |
+|  - Dashboard Overview (Active)    |  +----------------------------------------------------------+  |
+|  - Websites & Domains Manager     |  | Breadcrumb Navigator Loop: / home / blog.digitalneo.net   |  |
+|  - Website File Management        |  +----------------------------------------------------------+  |
+|  - Databases Engine Manager       |  |                                                          |  |
+|  - System Resource Telemetry      |  | METRIC TILES GRID (CPU Usage, RAM Usage, Disk I/O, etc.) |  |
+|  - Security Center Optimization   |  |                                                          |  |
+|  - Software & Apps / Docker Hub   |  +----------------------------------------------------------+  |
+|  - Tools & Zero-Downtime Migration|  |                                                          |  |
+|  - Premium Add-ons / Clustering   |  | MAIN INTERACTION DATA TABLES / GRID SYSTEM LAYOUT BLOCKS  |  |
+|                                   |  |                                                          |  |
+|  -------------------------------  |  +----------------------------------------------------------+  |
+|  [PRIORITY SUPPORT WIDGET STATUS] |  | Bottom Info Strip: License Key Valid / Active Disk Alloc |  |
++-----------------------------------+---------------------------------------------------------------+</div>
+    </div>
+
+    <h2>2. Next-Generation "Panel Killer" Features (NEW)</h2>
+    <p>To truly override cPanel, Plesk, and CyberPanel, NeoCP must solve the biggest pain points for enterprise hosts: Migration Downtime, Dependency Hell, and Server Single-Points-of-Failure. These features must be implemented as core Go modules.</p>
+
+    <div class="ui-spec-card next-gen">
+        <h3>🚀 2.1 Universal Zero-Downtime Migration Engine (UZME)</h3>
+        <p>Traditional migrations via `.tar.gz` cause DNS propagation downtime. NeoCP completely overrides this by automating a reverse-proxy cutover.</p>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>API-Driven Live Sync <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>Cross-Panel API Bridges:</strong> Built-in connectors for cPanel WHM API, Plesk XML-RPC, and CyberPanel API. Admin provides root credentials/token of the old server.</li>
+                    <li><strong>Live Rsync & MySQL Sync:</strong> Asynchronously syncs files and replicates databases in real-time without taking the old site offline.</li>
+                </ul>
+            </div>
+            <div class="feature-subcard">
+                <h4>Seamless Proxy Cutover <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>Automated Proxy Injection:</strong> NeoCP connects to the old cPanel/Plesk server via SSH and temporarily rewrites its Nginx/Apache config to reverse-proxy traffic to the new NeoCP server.</li>
+                    <li><strong>Zero DNS Downtime:</strong> Users experience ZERO downtime while DNS propagates globally, as the old server seamlessly hands traffic to NeoCP.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-spec-card next-gen">
+        <h3>🐳 2.2 Docker Container Orchestration & Microservices</h3>
+        <p>Modern developers require containerization. NeoCP must offer native Docker orchestration per tenant, overriding Plesk's limited Docker extension.</p>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>Tenant-Isolated Docker Hub <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>1-Click Container Deploy:</strong> Direct integration with Docker Hub to deploy images (Node, Python, Go, custom) mapped to specific subdomains.</li>
+                    <li><strong>Docker Compose UI:</strong> Browser-based YAML editor for deploying complex multi-container stacks (e.g., App + Redis + PostgreSQL).</li>
+                </ul>
+            </div>
+            <div class="feature-subcard">
+                <h4>Advanced Caching Instances <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>Dedicated Redis/Memcached:</strong> 1-click spawn of isolated, password-protected Redis or Memcached instances for a specific tenant to accelerate WordPress/Magento, managed via local Unix sockets for max speed.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-spec-card next-gen">
+        <h3>🔄 2.3 1-Click Staging & Cloning Ecosystem</h3>
+        <p>A feature essential for enterprise developers that cPanel lacks natively and Plesk locks behind expensive tiers.</p>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>Staging to Production Push/Pull <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>Instant Cloning:</strong> Clone `domain.com` to `staging.domain.com` with automatic database prefixing and URL rewriting.</li>
+                    <li><strong>Granular Synchronization:</strong> UI to visually select whether to push "Files Only", "Database Only", or "Both" from Staging back to Production, complete with automated pre-push backups.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-spec-card next-gen">
+        <h3>🌐 2.4 Multi-Node Clustering (High Availability)</h3>
+        <p>NeoCP scales beyond a single server. It acts as a Master Controller for a cluster of nodes.</p>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>Cluster Management Dashboard <span class="badge advanced">Next-Gen</span></h4>
+                <ul>
+                    <li><strong>Role Assignment:</strong> Add new VPS/Dedicated servers to the NeoCP cluster via UI and assign roles: Web Node, Database Node, or Mail Node.</li>
+                    <li><strong>Automated Load Balancing:</strong> NeoCP automatically configures HAProxy/Nginx load balancers to distribute traffic across active Web Nodes for a single domain.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <h2>3. Complete Screen & Module Specification Reference (Legacy & Core)</h2>
+    <!-- Contains all previously discussed essential features -->
+    
+    <div class="ui-spec-card">
+        <h3>3.1 Dashboard & File Management</h3>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>Live Telemetry & Files</h4>
+                <ul>
+                    <li><strong>CPU/RAM/Disk Streams:</strong> Real-time asynchronous core arrays tracking processing load values.</li>
+                    <li><strong>File Manager & WebDAV:</strong> Visual directory explorer, `.htaccess`/`web.config` directory privacy, and WebDAV mounting.</li>
+                    <li><strong>Git Version Control:</strong> Continuous delivery pushes on commit hooks.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-spec-card">
+        <h3>3.2 Databases, PHP & Security Center</h3>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>Datastores & Runtime Selectors</h4>
+                <ul>
+                    <li><strong>Multi-Engine Data:</strong> MySQL/MariaDB/PostgreSQL grids with 1-click phpMyAdmin.</li>
+                    <li><strong>Context PHP Switcher:</strong> Instant switching between isolated engine builds (`7.4`, `8.0`, `8.2`, `8.3`).</li>
+                </ul>
+            </div>
+            <div class="feature-subcard">
+                <h4>Security Hardening & WAF</h4>
+                <ul>
+                    <li><strong>Brute Force & Anti-Malware:</strong> cPHulk-style logging, malware scanner definitions.</li>
+                    <li><strong>ModSecurity & Vendors:</strong> UI for OWASP rule sets, TCP Wrappers, and compiler access locking.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-spec-card">
+        <h3>3.3 Tools, Settings, & Reseller Plugins</h3>
+        <div class="feature-subgrid">
+            <div class="feature-subcard">
+                <h4>WHM System Utilities</h4>
+                <ul>
+                    <li><strong>Maintenance & Cron:</strong> Root password modifiers, Task Schedulers, Server Profile & Time adjustments.</li>
+                    <li><strong>DNS & Mail:</strong> BIND9/PowerDNS dynamic compilation, DKIM/SPF global signing, Mail Queue Manager.</li>
+                    <li><strong>Backups:</strong> Incremental archival to S3/SFTP.</li>
+                </ul>
+            </div>
+            <div class="feature-subcard">
+                <h4>Reseller Master & WHMCS Linkage</h4>
+                <ul>
+                    <li><strong>Resource Partitioning:</strong> Parent operators design sub-hosting packages, enforcing LVE/Cgroup limits.</li>
+                    <li><strong>Automated Billing Sync:</strong> Full provisioning API hooks designed to handle account lifecycles directly from **WHMCS**.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <h2>4. Production-Grade Back-End Execution Engine (Go Core V5)</h2>
+    <p>To support the Next-Gen features, the NeoCP Orchestrator interface is expanded with advanced clustering and migration endpoints.</p>
+
+    <pre><code>package main
+
+import (
+    "context"
+)
+
+// NeoCPProOrchestrator unifies all functional system methods required by the panel views.
+type NeoCPProOrchestrator interface {
+    // 1. Next-Gen Zero-Downtime Migration Engine (UZME)
+    ExecuteZeroDowntimeMigration(ctx context.Context, source SourcePanelConfig, target DomainConfig) (*MigrationStream, error)
+    ConfigureSourceReverseProxy(sourceCreds Credentials, targetIP string) error
+
+    // 2. Docker & Container Orchestration
+    DeployDockerStack(tenantID string, composeYAML string) (*DockerDeploymentStatus, error)
+    SpawnIsolatedRedisCache(tenantID string, memLimitMB int) (*RedisConnectionDetails, error)
+
+    // 3. Staging & Clustering
+    CloneToStaging(productionDomain string, stagingSubdomain string) error
+    PushStagingToProduction(stagingSubdomain string, syncMode string) error // Mode: files, db, both
+    AttachClusterNode(nodeIP string, sshKey string, nodeRole string) (*NodeStatus, error)
+
+    // 4. Standard Dashboard & Telemetry Engines
+    StreamLiveMetrics(ctx context.Context, dataStream chan<- SystemHealthReport) error
+    MutatePHPSiteRuntime(domain string, targetVersion string) error
+    RegisterDatabaseInstance(dbSpec DatabaseCreationSpec) (*DatabaseReceipt, error)
+    ConfigureWAFRules(domain string, ruleConfig WAFConfigPayload) error
+    
+    // 5. Billing & Reseller Systems
+    SynchronizeBillingState(apiKey string, billingAction string) (*BillingSyncStatus, error)
+    EnforceResourceQuotas(username string, limits QuotaLimitsPayload) error
+}
+
+// Data Schema Definitions supporting the Next-Gen Core Engine
+type SourcePanelConfig struct {
+    PanelType   string `json:"panel_type"` // cpanel, plesk, cyberpanel
+    Hostname    string `json:"hostname"`
+    APIToken    string `json:"api_token"`
+    RootSSHKey  string `json:"root_ssh_key"`
+}
+
+type MigrationStream struct {
+    Status       string  `json:"status"` // syncing_files, syncing_db, proxy_active, complete
+    ProgressPct  float64 `json:"progress_pct"`
+    ProxyEnabled bool    `json:"proxy_enabled"`
+}
+
+type DockerDeploymentStatus struct {
+    StackID     string `json:"stack_id"`
+    Status      string `json:"status"` // running, failed
+    MappedPorts []int  `json:"mapped_ports"`
+}
+
+type NodeStatus struct {
+    NodeID    string `json:"node_id"`
+    Role      string `json:"role"` // web, db, mail
+    IsActive  bool   `json:"is_active"`
+    Heartbeat int64  `json:"heartbeat"`
+}
+
+// (Legacy structs like SystemHealthReport, DatabaseCreationSpec, WAFConfigPayload remain active here)
+</code></pre>
+
+    <h2>5. Implementation Blueprint & Execution Checklist</h2>
+    <p>Instruct your automated AI Agent to implement this master document in consecutive deployment phases:</p>
+    <ol>
+        <li><strong>Phase 1: Persistence & Bootstrapping:</strong> Initialize the monolithic Go project, embedded SQLite DB, and HTTPS cert engine.</li>
+        <li><strong>Phase 2: Security & Sandbox Enforcement:</strong> Command parameterization validation, Cgroups/AppPool limit enforcement, JWT roles.</li>
+        <li><strong>Phase 3: Core Service Registry & Dynamic Writers:</strong> Platform-specific orchestration modules (`//go:build linux|windows`), PHP-FPM and Nginx/IIS config writers.</li>
+        <li><strong>Phase 4: Next-Gen Migration & Docker Engines:</strong> Build the API connectors for cPanel/Plesk syncing, the reverse-proxy injector for Zero-Downtime migrations, and the Docker SDK Go bindings.</li>
+        <li><strong>Phase 5: Reactive Dashboards & Clustering:</strong> Package the HTML/CSS/JS via `//go:embed`, open WebSocket telemetry streams, and initialize the multi-node gRPC cluster communicators.</li>
+    </ol>
+</div>
+
+</body>
+</html>
