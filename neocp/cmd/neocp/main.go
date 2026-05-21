@@ -72,7 +72,7 @@ func main() {
 
 	// Public Routes
 	mux.HandleFunc("/api/login", handleLogin)
-	mux.HandleFunc("/api/telemetry/ws", api.TelemetryWebSocketHandler)
+	mux.Handle("/api/telemetry/ws", api.RequireRole("admin")(http.HandlerFunc(api.TelemetryWebSocketHandler)))
 
 	// Sub FS for static assets
 	subFS, err := fs.Sub(staticFS, "web/static")

@@ -99,7 +99,7 @@
                     <li class="menu-item" data-target="software">
                         <span class="item-icon">📦</span> Softaculous & Apps
                     </li>
-                    <li class="menu-item" data-target="system">
+                    <li class="menu-item admin-only" data-target="system">
                         <span class="item-icon">📈</span> Telemetry & Processes
                     </li>
                 </ul>
@@ -109,13 +109,13 @@
                     <li class="menu-item" data-target="migration">
                         <span class="item-icon">🚀</span> UZME Migration Engine
                     </li>
-                    <li class="menu-item" data-target="clustering">
+                    <li class="menu-item admin-only" data-target="clustering">
                         <span class="item-icon">🔄</span> Staging & Clustering
                     </li>
-                    <li class="menu-item" data-target="reseller">
+                    <li class="menu-item admin-only" data-target="reseller">
                         <span class="item-icon">🏢</span> Reseller Master
                     </li>
-                    <li class="menu-item" data-target="terminal">
+                    <li class="menu-item admin-only" data-target="terminal">
                         <span class="item-icon">💻</span> Visual Web Terminal
                     </li>
                 </ul>
@@ -179,7 +179,7 @@
                 
                 <!-- VIEW 1: DASHBOARD OVERVIEW -->
                 <div class="viewport-view active" id="view-dashboard">
-                    <div class="dashboard-metrics-grid">
+                    <div class="dashboard-metrics-grid admin-only">
                         <div class="metric-card glass">
                             <div class="metric-header">
                                 <h3>Overall CPU Load</h3>
@@ -224,7 +224,7 @@
                     </div>
 
                     <!-- 8-Core Live Tracking Array -->
-                    <div class="core-telemetry-section glass">
+                    <div class="core-telemetry-section glass admin-only">
                         <div class="section-title-wrapper">
                             <h4>8-Core Processors Thread Diagnostics</h4>
                             <span class="telemetry-live-label"><span class="pulse-dot"></span> WebSockets Stream (1000ms)</span>
@@ -259,7 +259,7 @@
                                     <span class="shortcut-icon">🚀</span>
                                     <span>Migrate Server</span>
                                 </button>
-                                <button class="shortcut-item" data-target="terminal">
+                                <button class="shortcut-item admin-only" data-target="terminal">
                                     <span class="shortcut-icon">💻</span>
                                     <span>Root Terminal</span>
                                 </button>

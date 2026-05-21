@@ -106,25 +106,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Enforce multi-tenant GUI boundaries dynamically
     function enforceRoleCapabilities() {
-        const resellerMenu = document.querySelector('[data-target="reseller"]');
-        const systemMenu = document.querySelector('[data-target="system"]');
-        const clusterMenu = document.querySelector('[data-target="clustering"]');
+        // Reset all hidden elements
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.reseller-only').forEach(el => el.style.display = 'none');
 
-        if (currentRole === 'customer') {
-            resellerMenu.style.opacity = '0.3';
-            resellerMenu.style.pointerEvents = 'none';
-            clusterMenu.style.opacity = '0.3';
-            clusterMenu.style.pointerEvents = 'none';
-        } else if (currentRole === 'reseller') {
-            resellerMenu.style.opacity = '1';
-            resellerMenu.style.pointerEvents = 'auto';
-            clusterMenu.style.opacity = '0.3';
-            clusterMenu.style.pointerEvents = 'none';
-        } else { // admin
-            resellerMenu.style.opacity = '1';
-            resellerMenu.style.pointerEvents = 'auto';
-            clusterMenu.style.opacity = '1';
-            clusterMenu.style.pointerEvents = 'auto';
+        // Hide sensitive menu sections for customers
+        const sections = document.querySelectorAll('.menu-section');
+        sections.forEach(sec => {
+            if (sec.textContent === 'Enterprise Ecosystem' && currentRole === 'customer') {
+                sec.style.display = 'none';
+            } else {
+                sec.style.display = 'block';
+            }
+        });
+
+        if (currentRole === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => {
+                // Determine original display type
+                if (el.classList.contains('dashboard-metrics-grid')) el.style.display = 'grid';
+                else if (el.classList.contains('menu-item')) el.style.display = 'list-item';
+                else if (el.classList.contains('shortcut-item')) el.style.display = 'flex';
+                else el.style.display = 'block';
+            });
+        }
+
+        if (currentRole === 'reseller' || currentRole === 'admin') {
+            document.querySelectorAll('.reseller-only').forEach(el => el.style.display = 'block');
+        }
+
+        // Dashboard specific tweaks: hide system-wide telemetry from customers
+        const dashMetrics = document.querySelector('.dashboard-metrics-grid');
+        const threadDiag = document.querySelector('.core-telemetry-section');
+
+        if (currentRole === 'customer' || currentRole === 'reseller') {
+            if (dashMetrics) dashMetrics.style.display = 'none';
+            if (threadDiag) threadDiag.style.display = 'none';
+        } else {
+            if (dashMetrics) dashMetrics.style.display = 'grid';
+            if (threadDiag) threadDiag.style.display = 'block';
         }
     }
 
