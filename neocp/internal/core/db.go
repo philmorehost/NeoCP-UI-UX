@@ -16,6 +16,7 @@ type Account struct {
 	Username       string    `json:"username"`
 	Password       string    `json:"password"`
 	Role           string    `json:"role"` // admin, reseller, customer
+	Owner          string    `json:"owner"` // Who owns this account (admin or reseller)
 	Plan           string    `json:"plan"`
 	Email          string    `json:"email"`
 	DiskUsed       int64     `json:"disk_used"`       // in MB
@@ -24,6 +25,17 @@ type Account struct {
 	BandwidthLimit int64     `json:"bandwidth_limit"` // in GB
 	DomainsUsed    int       `json:"domains_used"`
 	DomainsLimit   int       `json:"domains_limit"`
+	DatabasesUsed  int       `json:"databases_used"`
+	DatabasesLimit int       `json:"databases_limit"`
+	FTPUsed        int       `json:"ftp_used"`
+	FTPLimit       int       `json:"ftp_limit"`
+	EmailUsed      int       `json:"email_used"`
+	EmailLimit     int       `json:"email_limit"`
+	SharedIP       string    `json:"shared_ip"`
+	DedicatedIP    string    `json:"dedicated_ip"`
+	Nameservers    []string  `json:"nameservers"`
+	Locale         string    `json:"locale"`
+	ShellAccess    bool      `json:"shell_access"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -84,14 +96,28 @@ type CronJob struct {
 }
 
 type ResellerPackage struct {
-	Name           string    `json:"name"`
-	DiskLimit      int64     `json:"disk_limit"`
-	BandwidthLimit int64     `json:"bandwidth_limit"`
-	DomainsLimit   int       `json:"domains_limit"`
-	DatabasesLimit int       `json:"databases_limit"`
-	LVECpuPct      int       `json:"lve_cpu_pct"`
-	LVERamMB       int       `json:"lve_ram_mb"`
-	CreatedAt      time.Time `json:"created_at"`
+	Name             string    `json:"name"`
+	Owner            string    `json:"owner"` // Who created the package
+	DiskQuota        string    `json:"disk_quota"` // "1GB", "unlimited"
+	Bandwidth        string    `json:"bandwidth"`  // "100GB", "unlimited"
+	MaxDomains       int       `json:"max_domains"` // -1 for unlimited
+	MaxDatabases     int       `json:"max_databases"`
+	MaxFTP           int       `json:"max_ftp"`
+	MaxEmail         int       `json:"max_email"`
+	MaxSubdomains    int       `json:"max_subdomains"`
+	MaxParkedDomains int       `json:"max_parked_domains"`
+	MaxAddonDomains  int       `json:"max_addon_domains"`
+	HourlyEmailLimit int       `json:"hourly_email_limit"`
+	FailedEmailPct   int       `json:"failed_email_pct"`
+	MaxEmailQuota    string    `json:"max_email_quota"`
+	LVECpuPct        int       `json:"lve_cpu_pct"`
+	LVERamMB         int       `json:"lve_ram_mb"`
+	IsReseller       bool      `json:"is_reseller"` // WHMReseller extension
+	DedicatedIP      bool      `json:"dedicated_ip"`
+	ShellAccess      bool      `json:"shell_access"`
+	CGIAccess        bool      `json:"cgi_access"`
+	DigestAuth       bool      `json:"digest_auth"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type TicketMessage struct {
@@ -123,6 +149,21 @@ type FirewallBlock struct {
 	IP        string    `json:"ip"`
 	Reason    string    `json:"reason"`
 	BlockedAt time.Time `json:"blocked_at"`
+}
+
+type IPAddress struct {
+	IP        string `json:"ip"`
+	Subnet    string `json:"subnet"`
+	IsShared  bool   `json:"is_shared"`
+	IsAssigned bool   `json:"is_assigned"`
+	Owner     string `json:"owner"` // Who it's delegated to (admin, reseller, user)
+}
+
+type ServerConfig struct {
+	Hostname    string   `json:"hostname"`
+	Nameservers []string `json:"nameservers"`
+	Resolvers   []string `json:"resolvers"`
+	SharedIP    string   `json:"shared_ip"`
 }
 
 type ClusterNode struct {
@@ -160,6 +201,8 @@ type DatabaseStore struct {
 	MigrationTasks   map[string]MigrationTask   `json:"migration_tasks"`
 	FirewallBlocks   map[string]FirewallBlock   `json:"firewall_blocks"`
 	ClusterNodes     map[string]ClusterNode     `json:"cluster_nodes"`
+	IPAddresses      []IPAddress                `json:"ip_addresses"`
+	Server           ServerConfig               `json:"server"`
 }
 
 type DatabaseEngine struct {
@@ -259,14 +302,19 @@ func (db *DatabaseEngine) seedDefaultData() {
 			Username:       "admin",
 			Password:       "admin123", // In production this would be hashed. Keep plain text for easy visual testing of custom dashboard.
 			Role:           "admin",
+			Owner:          "root",
 			Plan:           "Unlimited System Plan",
 			Email:          "admin@neocp.io",
 			DiskUsed:       1024,
-			DiskLimit:      0, // 0 = unlimited
+			DiskLimit:      -1, // -1 = unlimited
 			BandwidthUsed:  45,
-			BandwidthLimit: 0,
+			BandwidthLimit: -1,
 			DomainsUsed:    3,
-			DomainsLimit:   0,
+			DomainsLimit:   -1,
+			DatabasesLimit: -1,
+			FTPLimit:       -1,
+			EmailLimit:     -1,
+			SharedIP:       "192.168.1.100",
 			CreatedAt:      time.Now(),
 		}
 	}
@@ -277,6 +325,7 @@ func (db *DatabaseEngine) seedDefaultData() {
 			Username:       "reseller1",
 			Password:       "reseller123",
 			Role:           "reseller",
+			Owner:          "admin",
 			Plan:           "Gold Reseller Pack",
 			Email:          "reseller@neocp.io",
 			DiskUsed:       240,
@@ -285,6 +334,10 @@ func (db *DatabaseEngine) seedDefaultData() {
 			BandwidthLimit: 2000,
 			DomainsUsed:    1,
 			DomainsLimit:   50,
+			DatabasesLimit: 100,
+			FTPLimit:       100,
+			EmailLimit:     100,
+			SharedIP:       "192.168.1.100",
 			CreatedAt:      time.Now(),
 		}
 	}
@@ -295,6 +348,7 @@ func (db *DatabaseEngine) seedDefaultData() {
 			Username:       "patel",
 			Password:       "patel123",
 			Role:           "customer",
+			Owner:          "reseller1",
 			Plan:           "Standard Hosting Plan",
 			Email:          "a.patel@digitalneo.net",
 			DiskUsed:       120,
@@ -303,6 +357,10 @@ func (db *DatabaseEngine) seedDefaultData() {
 			BandwidthLimit: 100,
 			DomainsUsed:    2,
 			DomainsLimit:   10,
+			DatabasesLimit: 5,
+			FTPLimit:       5,
+			EmailLimit:     10,
+			SharedIP:       "192.168.1.100",
 			CreatedAt:      time.Now(),
 		}
 	}
@@ -336,24 +394,32 @@ func (db *DatabaseEngine) seedDefaultData() {
 	// Seed default reseller packages
 	if len(db.store.ResellerPackages) == 0 {
 		db.store.ResellerPackages["Premium-Personal"] = ResellerPackage{
-			Name:           "Premium-Personal",
-			DiskLimit:      2000,
-			BandwidthLimit: 50,
-			DomainsLimit:   3,
-			DatabasesLimit: 5,
-			LVECpuPct:      50,
-			LVERamMB:       512,
-			CreatedAt:      time.Now(),
+			Name:             "Premium-Personal",
+			Owner:            "admin",
+			DiskQuota:        "2GB",
+			Bandwidth:        "50GB",
+			MaxDomains:       3,
+			MaxDatabases:     5,
+			MaxFTP:           5,
+			MaxEmail:         10,
+			HourlyEmailLimit: 100,
+			LVECpuPct:        50,
+			LVERamMB:         512,
+			CreatedAt:        time.Now(),
 		}
 		db.store.ResellerPackages["Enterprise-Cluster"] = ResellerPackage{
-			Name:           "Enterprise-Cluster",
-			DiskLimit:      50000,
-			BandwidthLimit: 1000,
-			DomainsLimit:   100,
-			DatabasesLimit: 250,
-			LVECpuPct:      100,
-			LVERamMB:       2048,
-			CreatedAt:      time.Now(),
+			Name:             "Enterprise-Cluster",
+			Owner:            "admin",
+			DiskQuota:        "50GB",
+			Bandwidth:        "1000GB",
+			MaxDomains:       100,
+			MaxDatabases:     250,
+			MaxFTP:           250,
+			MaxEmail:         500,
+			HourlyEmailLimit: 1000,
+			LVECpuPct:        100,
+			LVERamMB:         2048,
+			CreatedAt:        time.Now(),
 		}
 	}
 
@@ -377,6 +443,25 @@ func (db *DatabaseEngine) seedDefaultData() {
 			TaskName:  "WordPress Core Cron",
 			Command:   "php /home/patel/public_html/wp-cron.php",
 			Schedule:  "*/15 * * * *",
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+		// Default system crons
+		db.store.CronJobs["cron_system_scan"] = CronJob{
+			ID:        "cron_system_scan",
+			Owner:     "admin",
+			TaskName:  "Weekly Full Server Malware Scan",
+			Command:   "/usr/local/neocp/bin/scan-server --full",
+			Schedule:  "0 3 * * 0", // Every Sunday at 3 AM
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+		db.store.CronJobs["cron_trash_purge"] = CronJob{
+			ID:        "cron_trash_purge",
+			Owner:     "admin",
+			TaskName:  "Automatic 30-Day Trash Purge",
+			Command:   "/usr/local/neocp/bin/purge-trash --days 30",
+			Schedule:  "0 4 * * *", // Every day at 4 AM
 			Active:    true,
 			CreatedAt: time.Now(),
 		}
@@ -406,10 +491,62 @@ func (db *DatabaseEngine) seedDefaultData() {
 		}
 	}
 
+	// Seed IP Addresses
+	if len(db.store.IPAddresses) == 0 {
+		db.store.IPAddresses = []IPAddress{
+			{IP: "192.168.1.100", Subnet: "255.255.255.0", IsShared: true, IsAssigned: true, Owner: "admin"},
+			{IP: "192.168.1.101", Subnet: "255.255.255.0", IsShared: false, IsAssigned: false, Owner: "admin"},
+		}
+	}
+
+	// Seed Server Config
+	if db.store.Server.Hostname == "" {
+		db.store.Server = ServerConfig{
+			Hostname:    "neocp.professional.server",
+			Nameservers: []string{"ns1.neocp.io", "ns2.neocp.io"},
+			Resolvers:   []string{"8.8.8.8", "8.8.4.4"},
+			SharedIP:    "192.168.1.100",
+		}
+	}
+
 	db.save()
 }
 
 // ---------------- CRUD Operations for Multi-Tenancy ----------------
+
+func (db *DatabaseEngine) GetAccounts() []Account {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	var accs []Account
+	for _, acc := range db.store.Accounts {
+		accs = append(accs, acc)
+	}
+	return accs
+}
+
+func (db *DatabaseEngine) TransferOwnership(username, newOwner string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	acc, exists := db.store.Accounts[username]
+	if !exists {
+		return errors.New("account not found")
+	}
+	acc.Owner = newOwner
+	db.store.Accounts[username] = acc
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) UpdateAccount(acc Account) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if _, exists := db.store.Accounts[acc.Username]; !exists {
+		return errors.New("account not found")
+	}
+	db.store.Accounts[acc.Username] = acc
+	db.save()
+	return nil
+}
 
 func (db *DatabaseEngine) Authenticate(username, password string) (*Account, error) {
 	db.mu.RLock()
@@ -466,6 +603,59 @@ func (db *DatabaseEngine) CreateDomain(dom Domain) error {
 	db.store.Domains[dom.DomainName] = dom
 	db.save()
 	return nil
+}
+
+// ---------------- IP Management ----------------
+
+func (db *DatabaseEngine) GetIPAddresses() []IPAddress {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.store.IPAddresses
+}
+
+func (db *DatabaseEngine) AddIPAddress(ip IPAddress) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	for _, existing := range db.store.IPAddresses {
+		if existing.IP == ip.IP {
+			return errors.New("IP address already exists")
+		}
+	}
+	db.store.IPAddresses = append(db.store.IPAddresses, ip)
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) DelegateIP(ip, resellerID string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	for i, existing := range db.store.IPAddresses {
+		if existing.IP == ip {
+			if existing.IsShared {
+				return errors.New("cannot delegate shared IP")
+			}
+			db.store.IPAddresses[i].Owner = resellerID
+			db.store.IPAddresses[i].IsAssigned = true
+			db.save()
+			return nil
+		}
+	}
+	return errors.New("IP address not found")
+}
+
+func (db *DatabaseEngine) UpdateServerConfig(conf ServerConfig) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.store.Server = conf
+	db.save()
+}
+
+func (db *DatabaseEngine) GetServerConfig() ServerConfig {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.store.Server
 }
 
 func (db *DatabaseEngine) DeleteDomain(domainName string) error {
@@ -606,6 +796,29 @@ func (db *DatabaseEngine) DeleteDatabase(dbName string) error {
 	return nil
 }
 
+func (db *DatabaseEngine) GetDatabase(dbName string) (*Database, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	d, exists := db.store.Databases[dbName]
+	if !exists {
+		return nil, errors.New("database not found")
+	}
+	return &d, nil
+}
+
+func (db *DatabaseEngine) UpdateDatabasePassword(dbName, newPass string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	d, exists := db.store.Databases[dbName]
+	if !exists {
+		return errors.New("database not found")
+	}
+	d.Password = newPass
+	db.store.Databases[dbName] = d
+	db.save()
+	return nil
+}
+
 func (db *DatabaseEngine) UpdateDatabaseIPs(dbName, ips string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -672,9 +885,38 @@ func (db *DatabaseEngine) CreatePackage(pkg ResellerPackage) error {
 	if _, exists := db.store.ResellerPackages[pkg.Name]; exists {
 		return errors.New("package name already exists")
 	}
+
+	// Verification logic for package owner (only admin or reseller) can be added here or in API layer
+
 	db.store.ResellerPackages[pkg.Name] = pkg
 	db.save()
 	return nil
+}
+
+func (db *DatabaseEngine) UpdatePackage(pkg ResellerPackage) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.ResellerPackages[pkg.Name]; !exists {
+		return errors.New("package not found")
+	}
+
+	db.store.ResellerPackages[pkg.Name] = pkg
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetPackagesByOwner(owner string) []ResellerPackage {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var pkgs []ResellerPackage
+	for _, pkg := range db.store.ResellerPackages {
+		if pkg.Owner == owner {
+			pkgs = append(pkgs, pkg)
+		}
+	}
+	return pkgs
 }
 
 func (db *DatabaseEngine) DeletePackage(name string) error {

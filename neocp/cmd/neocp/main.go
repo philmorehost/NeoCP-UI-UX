@@ -118,14 +118,22 @@ func main() {
 	mux.Handle("/api/domains/privacy", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainPrivacyChange)))
 	mux.Handle("/api/domains/redirect", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainRedirectChange)))
 	mux.Handle("/api/domains/dns", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDNSRecords)))
+	mux.Handle("/api/domains/dns/sync", api.RequireRole("admin")(http.HandlerFunc(handleDNSSync)))
 	mux.Handle("/api/domains/waf", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDomainWAF)))
+	mux.Handle("/api/domains/nginx/clearcache", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainClearNginxCache)))
 
 	// Database endpoints
 	mux.Handle("/api/databases", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabases)))
 	mux.Handle("/api/databases/ips", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabaseIPsChange)))
+	mux.Handle("/api/databases/password", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabasePasswordChange)))
+	mux.Handle("/api/databases/repair", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabaseRepair)))
 
 	// Reseller package endpoints
 	mux.Handle("/api/packages", api.RequireRole("reseller", "admin")(http.HandlerFunc(handlePackages)))
+
+	// Reseller Center endpoints
+	mux.Handle("/api/reseller/accounts", api.RequireRole("admin", "reseller")(http.HandlerFunc(handleResellerAccounts)))
+	mux.Handle("/api/reseller/transfer", api.RequireRole("admin")(http.HandlerFunc(handleAccountTransfer)))
 
 	// Priority support tickets
 	mux.Handle("/api/tickets", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleTickets)))
@@ -133,6 +141,9 @@ func main() {
 
 	// Migration Tasks (UZME)
 	mux.Handle("/api/migrations", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleMigrations)))
+
+	// Cron Jobs
+	mux.Handle("/api/cron", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleCronJobs)))
 
 	// System Process Manager
 	mux.Handle("/api/processes", api.RequireRole("admin")(http.HandlerFunc(handleProcessesList)))
@@ -148,6 +159,7 @@ func main() {
 	mux.Handle("/api/filemanager/write", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerWrite)))
 	mux.Handle("/api/filemanager/create", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerCreate)))
 	mux.Handle("/api/filemanager/delete", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerDelete)))
+	mux.Handle("/api/filemanager/emptytrash", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerEmptyTrash)))
 
 	// Docker Container endpoints
 	mux.Handle("/api/docker/containers", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDockerContainers)))
@@ -178,6 +190,11 @@ func main() {
 	// Clustering endpoints
 	mux.Handle("/api/cluster/nodes", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
 	mux.Handle("/api/cluster/attach", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
+
+	// Server & IP Management
+	mux.Handle("/api/server/config", api.RequireRole("admin")(http.HandlerFunc(handleServerConfig)))
+	mux.Handle("/api/server/ips", api.RequireRole("admin")(http.HandlerFunc(handleIPAddresses)))
+	mux.Handle("/api/server/ips/delegate", api.RequireRole("admin")(http.HandlerFunc(handleIPDelegate)))
 
 	// Spin secure mTLS Cluster Server on port :8444
 	go func() {
@@ -332,6 +349,35 @@ func handleAccountDetail(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(acc)
 }
 
+func handleDomainClearNginxCache(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		DomainName string `json:"domain_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	// Simulate user-specific NGINX cache purge
+	time.Sleep(1 * time.Second)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "log": "NGINX cache for ` + req.DomainName + ` purged successfully."}`))
+}
+
+func handleDNSSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Simulate global DNS synchronization
+	time.Sleep(3 * time.Second)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "log": "Global DNS cluster synchronization complete."}`))
+}
+
 func handleDomains(w http.ResponseWriter, r *http.Request) {
 	db := core.GetDB()
 	username := r.Header.Get("NeoCP-User")
@@ -369,9 +415,9 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 			for _, pkg := range packages {
 				if pkg.Name == acc.Plan {
 					currentDoms := len(db.GetDomains(username, false))
-					if pkg.DomainsLimit > 0 && currentDoms >= pkg.DomainsLimit {
+					if pkg.MaxDomains > 0 && currentDoms >= pkg.MaxDomains {
 						w.WriteHeader(http.StatusForbidden)
-						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package domains limit reached (%d limit)", pkg.DomainsLimit)})
+						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package domains limit reached (%d limit)", pkg.MaxDomains)})
 						return
 					}
 					break
@@ -721,9 +767,9 @@ func handleDatabases(w http.ResponseWriter, r *http.Request) {
 			for _, pkg := range packages {
 				if pkg.Name == acc.Plan {
 					currentDBs := len(db.GetDatabases(username, false))
-					if pkg.DatabasesLimit > 0 && currentDBs >= pkg.DatabasesLimit {
+					if pkg.MaxDatabases > 0 && currentDBs >= pkg.MaxDatabases {
 						w.WriteHeader(http.StatusForbidden)
-						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package databases limit reached (%d limit)", pkg.DatabasesLimit)})
+						json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Forbidden: Reseller Package databases limit reached (%d limit)", pkg.MaxDatabases)})
 						return
 					}
 					break
@@ -776,6 +822,46 @@ func handleDatabases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func handleDatabasePasswordChange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name     string `json:"name"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	db := core.GetDB()
+	if err := db.UpdateDatabasePassword(req.Name, req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true}`))
+}
+
+func handleDatabaseRepair(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	// Simulate repair
+	time.Sleep(2 * time.Second)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "log": "Database repair completed successfully."}`))
 }
 
 func handleDatabaseIPsChange(w http.ResponseWriter, r *http.Request) {
@@ -890,6 +976,71 @@ func handleTickets(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ticket)
 		return
 	}
+}
+
+func handleCronJobs(w http.ResponseWriter, r *http.Request) {
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+
+	if r.Method == http.MethodGet {
+		jobs := db.GetCronJobs(username, isAdmin)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jobs)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var job core.CronJob
+		if err := json.NewDecoder(r.Body).Decode(&job); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		job.Owner = username
+		job.CreatedAt = time.Now()
+		if job.ID == "" {
+			job.ID = fmt.Sprintf("cron_%d", time.Now().UnixNano())
+		}
+		if err := db.CreateCronJob(job); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(job)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "Missing id", http.StatusBadRequest)
+			return
+		}
+		// Verification of ownership for non-admins
+		jobs := db.GetCronJobs(username, isAdmin)
+		found := false
+		for _, j := range jobs {
+			if j.ID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			http.Error(w, "Forbidden cron deletion", http.StatusForbidden)
+			return
+		}
+
+		if err := db.DeleteCronJob(id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success":true}`))
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 func handleTicketReply(w http.ResponseWriter, r *http.Request) {
@@ -1211,20 +1362,176 @@ func handleFileManagerDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	virtPath := r.URL.Query().Get("path")
+	force := r.URL.Query().Get("force") == "true"
 	phys, err := virtualToPhysical(virtPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
 
-	err = os.RemoveAll(phys)
+	if force {
+		err = os.RemoveAll(phys)
+	} else {
+		// Move to trash
+		username := r.Header.Get("NeoCP-User")
+		trashDir := filepath.Join(sandboxDir, username, ".trash")
+		os.MkdirAll(trashDir, 0755)
+
+		fileName := filepath.Base(phys)
+		// Add timestamp to avoid collisions
+		destPath := filepath.Join(trashDir, fmt.Sprintf("%d_%s", time.Now().Unix(), fileName))
+		err = os.Rename(phys, destPath)
+	}
+
 	if err != nil {
-		http.Error(w, "Deletion failed", http.StatusInternalServerError)
+		http.Error(w, "Deletion/Trash failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"success":true}`))
+}
+
+func handleServerConfig(w http.ResponseWriter, r *http.Request) {
+	db := core.GetDB()
+	if r.Method == http.MethodGet {
+		conf := db.GetServerConfig()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(conf)
+		return
+	}
+	if r.Method == http.MethodPost {
+		var conf core.ServerConfig
+		if err := json.NewDecoder(r.Body).Decode(&conf); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		db.UpdateServerConfig(conf)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success":true}`))
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func handleIPAddresses(w http.ResponseWriter, r *http.Request) {
+	db := core.GetDB()
+	if r.Method == http.MethodGet {
+		ips := db.GetIPAddresses()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ips)
+		return
+	}
+	if r.Method == http.MethodPost {
+		var ip core.IPAddress
+		if err := json.NewDecoder(r.Body).Decode(&ip); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		ip.Owner = "admin"
+		if err := db.AddIPAddress(ip); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(ip)
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func handleResellerAccounts(w http.ResponseWriter, r *http.Request) {
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	db := core.GetDB()
+
+	allAccs := db.GetAccounts()
+	var res []core.Account
+	for _, acc := range allAccs {
+		if role == "admin" {
+			res = append(res, acc)
+		} else if acc.Owner == username {
+			res = append(res, acc)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+func handleAccountTransfer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		AccountUser string `json:"username"`
+		NewOwner    string `json:"new_owner"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	db := core.GetDB()
+	if err := db.TransferOwnership(req.AccountUser, req.NewOwner); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true}`))
+}
+
+func handleIPDelegate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		IP         string `json:"ip"`
+		ResellerID string `json:"reseller_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	db := core.GetDB()
+	if err := db.DelegateIP(req.IP, req.ResellerID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true}`))
+}
+
+func handleFileManagerEmptyTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.Header.Get("NeoCP-User")
+	trashDir := filepath.Join(sandboxDir, username, ".trash")
+
+	// Recalculate space freed
+	var bytesFreed int64
+	filepath.Walk(trashDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			bytesFreed += info.Size()
+		}
+		return nil
+	})
+
+	err := os.RemoveAll(trashDir)
+	if err != nil {
+		http.Error(w, "Failed to empty trash", http.StatusInternalServerError)
+		return
+	}
+	os.MkdirAll(trashDir, 0755)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"bytes_freed": bytesFreed,
+	})
 }
 
 // ==========================================================================

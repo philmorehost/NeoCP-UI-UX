@@ -4,20 +4,33 @@
       "username": "admin",
       "password": "admin123",
       "role": "admin",
+      "owner": "root",
       "plan": "Unlimited System Plan",
       "email": "admin@neocp.io",
       "disk_used": 1024,
-      "disk_limit": 0,
+      "disk_limit": -1,
       "bandwidth_used": 45,
-      "bandwidth_limit": 0,
+      "bandwidth_limit": -1,
       "domains_used": 3,
-      "domains_limit": 0,
-      "created_at": "2026-05-21T23:33:52.869460654Z"
+      "domains_limit": -1,
+      "databases_used": 0,
+      "databases_limit": -1,
+      "ftp_used": 0,
+      "ftp_limit": -1,
+      "email_used": 0,
+      "email_limit": -1,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T08:28:48.209309835Z"
     },
     "patel": {
       "username": "patel",
       "password": "patel123",
       "role": "customer",
+      "owner": "reseller1",
       "plan": "Standard Hosting Plan",
       "email": "a.patel@digitalneo.net",
       "disk_used": 120,
@@ -26,12 +39,24 @@
       "bandwidth_limit": 100,
       "domains_used": 2,
       "domains_limit": 10,
-      "created_at": "2026-05-21T23:33:52.86946225Z"
+      "databases_used": 0,
+      "databases_limit": 5,
+      "ftp_used": 0,
+      "ftp_limit": 5,
+      "email_used": 0,
+      "email_limit": 10,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T08:28:48.209313325Z"
     },
     "reseller1": {
       "username": "reseller1",
       "password": "reseller123",
       "role": "reseller",
+      "owner": "admin",
       "plan": "Gold Reseller Pack",
       "email": "reseller@neocp.io",
       "disk_used": 240,
@@ -40,7 +65,18 @@
       "bandwidth_limit": 2000,
       "domains_used": 1,
       "domains_limit": 50,
-      "created_at": "2026-05-21T23:33:52.869461857Z"
+      "databases_used": 0,
+      "databases_limit": 100,
+      "ftp_used": 0,
+      "ftp_limit": 100,
+      "email_used": 0,
+      "email_limit": 100,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T08:28:48.209312721Z"
     }
   },
   "domains": {
@@ -54,7 +90,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-05T23:33:52.869462476Z",
+      "ssl_expires": "2026-08-06T08:28:48.209313633Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -67,7 +103,7 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-04-21T23:33:52.869508989Z"
+      "created_at": "2026-04-22T08:28:48.209389882Z"
     },
     "shop.digitalneo.net": {
       "domain_name": "shop.digitalneo.net",
@@ -79,7 +115,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-07-19T23:33:52.869509736Z",
+      "ssl_expires": "2026-07-20T08:28:48.209391125Z",
       "webdav_enabled": true,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -92,7 +128,7 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-11T23:33:52.869509867Z"
+      "created_at": "2026-05-12T08:28:48.209391351Z"
     }
   },
   "databases": {
@@ -102,7 +138,7 @@
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-21T23:33:52.86951111Z"
+      "created_at": "2026-05-22T08:28:48.209392859Z"
     }
   },
   "cron_jobs": {
@@ -113,29 +149,75 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-21T23:33:52.86951149Z"
+      "created_at": "2026-05-22T08:28:48.209402131Z"
+    },
+    "cron_system_scan": {
+      "id": "cron_system_scan",
+      "owner": "admin",
+      "task_name": "Weekly Full Server Malware Scan",
+      "command": "/usr/local/neocp/bin/scan-server --full",
+      "schedule": "0 3 * * 0",
+      "active": true,
+      "created_at": "2026-05-22T08:28:48.209410288Z"
+    },
+    "cron_trash_purge": {
+      "id": "cron_trash_purge",
+      "owner": "admin",
+      "task_name": "Automatic 30-Day Trash Purge",
+      "command": "/usr/local/neocp/bin/purge-trash --days 30",
+      "schedule": "0 4 * * *",
+      "active": true,
+      "created_at": "2026-05-22T08:28:48.209410672Z"
     }
   },
   "reseller_packages": {
     "Enterprise-Cluster": {
       "name": "Enterprise-Cluster",
-      "disk_limit": 50000,
-      "bandwidth_limit": 1000,
-      "domains_limit": 100,
-      "databases_limit": 250,
+      "owner": "admin",
+      "disk_quota": "50GB",
+      "bandwidth": "1000GB",
+      "max_domains": 100,
+      "max_databases": 250,
+      "max_ftp": 250,
+      "max_email": 500,
+      "max_subdomains": 0,
+      "max_parked_domains": 0,
+      "max_addon_domains": 0,
+      "hourly_email_limit": 1000,
+      "failed_email_pct": 0,
+      "max_email_quota": "",
       "lve_cpu_pct": 100,
       "lve_ram_mb": 2048,
-      "created_at": "2026-05-21T23:33:52.869510929Z"
+      "is_reseller": false,
+      "dedicated_ip": false,
+      "shell_access": false,
+      "cgi_access": false,
+      "digest_auth": false,
+      "created_at": "2026-05-22T08:28:48.209392393Z"
     },
     "Premium-Personal": {
       "name": "Premium-Personal",
-      "disk_limit": 2000,
-      "bandwidth_limit": 50,
-      "domains_limit": 3,
-      "databases_limit": 5,
+      "owner": "admin",
+      "disk_quota": "2GB",
+      "bandwidth": "50GB",
+      "max_domains": 3,
+      "max_databases": 5,
+      "max_ftp": 5,
+      "max_email": 10,
+      "max_subdomains": 0,
+      "max_parked_domains": 0,
+      "max_addon_domains": 0,
+      "hourly_email_limit": 100,
+      "failed_email_pct": 0,
+      "max_email_quota": "",
       "lve_cpu_pct": 50,
       "lve_ram_mb": 512,
-      "created_at": "2026-05-21T23:33:52.869510356Z"
+      "is_reseller": false,
+      "dedicated_ip": false,
+      "shell_access": false,
+      "cgi_access": false,
+      "digest_auth": false,
+      "created_at": "2026-05-22T08:28:48.209391781Z"
     }
   },
   "tickets": {
@@ -149,19 +231,47 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-21T21:33:52.869518344Z"
+          "timestamp": "2026-05-22T06:28:48.209410876Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-21T22:33:52.869518494Z"
+          "timestamp": "2026-05-22T07:28:48.209411089Z"
         }
       ],
-      "created_at": "2026-05-21T21:33:52.86951861Z"
+      "created_at": "2026-05-22T06:28:48.209411209Z"
     }
   },
   "docker_containers": {},
   "migration_tasks": {},
   "firewall_blocks": {},
-  "cluster_nodes": {}
+  "cluster_nodes": {},
+  "ip_addresses": [
+    {
+      "ip": "192.168.1.100",
+      "subnet": "255.255.255.0",
+      "is_shared": true,
+      "is_assigned": true,
+      "owner": "admin"
+    },
+    {
+      "ip": "192.168.1.101",
+      "subnet": "255.255.255.0",
+      "is_shared": false,
+      "is_assigned": false,
+      "owner": "admin"
+    }
+  ],
+  "server": {
+    "hostname": "neocp.professional.server",
+    "nameservers": [
+      "ns1.neocp.io",
+      "ns2.neocp.io"
+    ],
+    "resolvers": [
+      "8.8.8.8",
+      "8.8.4.4"
+    ],
+    "shared_ip": "192.168.1.100"
+  }
 }

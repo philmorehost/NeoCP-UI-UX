@@ -171,10 +171,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.title = `${sectionName} — NeoCP Professional`;
 
         // Action grid hooks
-        if (targetViewId === 'filemanager') loadFileExplorer();
+        if (targetViewId === 'filemanager') {
+            loadTrashSummary();
+            loadFileExplorer();
+        }
         if (targetViewId === 'domains') loadDomainsTable();
         if (targetViewId === 'databases') loadDatabasesTable();
-        if (targetViewId === 'reseller') loadPackagesTable();
+        if (targetViewId === 'reseller') {
+            loadPackagesTable();
+            loadResellerAccounts();
+        }
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
@@ -453,9 +459,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeDomainModalBtn = document.getElementById('close-domain-modal-btn');
     const submitDomainBtn = document.getElementById('modal-add-domain-submit');
 
+    async function loadPackagesForSelect() {
+        try {
+            const res = await fetch('/api/packages', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const pkgs = await res.json();
+            const select = document.getElementById('modal-package-select');
+            if (select) {
+                select.innerHTML = '';
+                pkgs.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (e) {}
+    }
+
     openAddDomainBtn.addEventListener('click', () => {
         document.getElementById('modal-domain-input').value = `app-${Math.floor(Math.random()*100)}.patelcloud.net`;
         document.getElementById('modal-webroot-input').value = `/home/${currentUser}/public_html/app`;
+        loadPackagesForSelect();
         addDomainModal.classList.add('active');
     });
 
@@ -467,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const domainName = document.getElementById('modal-domain-input').value;
         const webroot = document.getElementById('modal-webroot-input').value;
         const phpVersion = document.getElementById('modal-php-select').value;
+        const packagePlan = document.getElementById('modal-package-select').value;
         const sslToggle = document.getElementById('modal-ssl-toggle').checked;
 
         if (!domainName || !webroot) {
@@ -486,7 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     domain_name: domainName,
                     owner: currentUser,
                     php_version: phpVersion,
-                    ssl_active: sslToggle
+                    ssl_active: sslToggle,
+                    plan: packagePlan
                 })
             });
             const data = await res.json();
@@ -892,6 +920,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDirLabel = document.getElementById('filemanager-current-dir');
     const fmNewFileBtn = document.getElementById('filemanager-newfile-btn');
     const fmNewDirBtn = document.getElementById('filemanager-newdir-btn');
+    const fmPane = document.querySelector('.filemanager-content-pane');
+
+    if (fmPane) {
+        fmPane.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fmPane.style.borderColor = 'var(--accent-blue)';
+            fmPane.style.background = 'rgba(59, 130, 246, 0.05)';
+        });
+
+        fmPane.addEventListener('dragleave', () => {
+            fmPane.style.borderColor = '';
+            fmPane.style.background = '';
+        });
+
+        fmPane.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            fmPane.style.borderColor = '';
+            fmPane.style.background = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                addTaskIndicator();
+                showNotification(`Uploading ${files.length} items to user sandbox...`, 'info');
+
+                // Simulate multi-file production upload stream
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                    showNotification(`Buffered: ${file.name} (${formatBytes(file.size)})`, 'success');
+                }
+
+                showNotification('Upload complete. NeoCP enhanced drag-drop engine processed all nodes.', 'success');
+                removeTaskIndicator();
+                loadFileExplorer();
+            }
+        });
+    }
     const fmWebdavBtn = document.getElementById('filemanager-webdav-btn');
 
     fmNewFileBtn.addEventListener('click', async () => {
@@ -914,6 +979,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             showNotification('API connection error creating file.', 'error');
         } finally {
+            removeTaskIndicator();
+        }
+    });
+
+    document.getElementById('filemanager-empty-trash-btn').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to permanently delete all items in trash?')) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/filemanager/emptytrash', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Trash emptied. Freed ${formatBytes(data.bytes_freed)}`, 'success');
+                loadDashboardSummaries();
+            }
+        } catch (e) {} finally {
             removeTaskIndicator();
         }
     });
@@ -1027,8 +1110,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Delete file
                 tr.querySelector('.delete-file-btn').addEventListener('click', async () => {
-                    if (confirm(`Wipe ${item.name} permanently?`)) {
-                        await deleteSandboxItem(`${currentPath}/${item.name}`);
+                    const toTrash = confirm(`Move ${item.name} to trash? (Cancel to permanently delete)`);
+                    if (toTrash) {
+                        await deleteSandboxItem(`${currentPath}/${item.name}`, false);
+                    } else {
+                        if (confirm(`REALLY wipe ${item.name} PERMANENTLY?`)) {
+                            await deleteSandboxItem(`${currentPath}/${item.name}`, true);
+                        }
                     }
                 });
 
@@ -1042,10 +1130,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function deleteSandboxItem(path) {
+    async function loadTrashSummary() {
+        // Just used to update visual markers if needed
+    }
+
+    async function deleteSandboxItem(path, force = false) {
         addTaskIndicator();
         try {
-            const res = await fetch(`/api/filemanager/delete?path=${encodeURIComponent(path)}`, {
+            const res = await fetch(`/api/filemanager/delete?path=${encodeURIComponent(path)}&force=${force}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
@@ -1324,6 +1416,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveModsecBtn = document.getElementById('save-modsec-rules-btn');
     const blockedIps = document.getElementById('blocked-ips-count');
     const logBox = document.getElementById('cphulk-log-box');
+
+    // Real-time Malware Scanner Simulation
+    setInterval(() => {
+        const paths = ['/public_html/index.php', '/public_html/wp-config.php', '/.env', '/mail/inbox'];
+        const path = paths[Math.floor(Math.random() * paths.length)];
+        const findings = ['PHP.Shell.Generic', 'Malware.Heuristic.Exploit', 'Suspicious.Pattern.Match'];
+
+        if (Math.random() > 0.95) {
+            const finding = findings[Math.floor(Math.random() * findings.length)];
+            const line = document.createElement('div');
+            line.className = 'log-line text-orange';
+            const now = new Date().toLocaleTimeString();
+            line.innerHTML = `[${now}] <span class="badge badge-red" style="font-size:9px;">SCANNER</span> Threat detected in ${path}: <strong>${finding}</strong>. File quarantined & cleaned automatically.`;
+            logBox.prepend(line);
+            showNotification(`Real-time scanner mitigated a threat in ${path}`, 'error');
+        }
+    }, 15000);
 
     // Simulate real intrusion event streams
     setInterval(() => {
@@ -1771,12 +1880,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const createPkgBtn = document.getElementById('create-package-btn');
     createPkgBtn.addEventListener('click', async () => {
         const name = document.getElementById('pkg-name-input').value;
-        const disk = parseInt(document.getElementById('pkg-disk-input').value) || 0;
-        const bw = parseInt(document.getElementById('pkg-bw-input').value) || 0;
+        const disk = document.getElementById('pkg-disk-input').value;
+        const bw = document.getElementById('pkg-bw-input').value;
         const domains = parseInt(document.getElementById('pkg-domains-input').value) || 0;
         const db = parseInt(document.getElementById('pkg-db-input').value) || 0;
-        const cpu = parseInt(document.getElementById('pkg-cpu-input').value) || 0;
-        const ram = parseInt(document.getElementById('pkg-ram-input').value) || 0;
+        const ftp = parseInt(document.getElementById('pkg-ftp-input').value) || 0;
+        const email = parseInt(document.getElementById('pkg-email-input').value) || 0;
+        const relay = parseInt(document.getElementById('pkg-email-relay-input').value) || 0;
+        const failPct = parseInt(document.getElementById('pkg-email-fail-pct-input').value) || 0;
+        const isReseller = document.getElementById('pkg-reseller-toggle').checked;
 
         if (!name) {
             showNotification('Please enter a package name.', 'error');
@@ -1793,16 +1905,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     name,
-                    disk_limit: disk,
-                    bandwidth_limit: bw,
-                    domains_limit: domains,
-                    databases_limit: db,
-                    lve_cpu_pct: cpu,
-                    lve_ram_mb: ram
+                    owner: currentUser,
+                    disk_quota: disk,
+                    bandwidth: bw,
+                    max_domains: domains,
+                    max_databases: db,
+                    max_ftp: ftp,
+                    max_email: email,
+                    hourly_email_limit: relay,
+                    failed_email_pct: failPct,
+                    is_reseller: isReseller
                 })
             });
             if (res.ok) {
-                showNotification('WHM custom reseller subscription plan deployed.', 'success');
+                showNotification('Production package deployed successfully.', 'success');
                 loadPackagesTable();
             }
         } catch (e) {
@@ -1828,11 +1944,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong class="text-blue">${pkg.name}</strong></td>
-                    <td>${pkg.disk_limit} MB / ${pkg.bandwidth_limit} GB</td>
-                    <td>D:${pkg.domains_limit} | DB:${pkg.databases_limit}</td>
-                    <td><span class="status-badge badge-green">${pkg.lve_cpu_pct}% CPU | ${pkg.lve_ram_mb}MB</span></td>
+                    <td>${pkg.owner}</td>
+                    <td>${pkg.disk_quota} / ${pkg.bandwidth}</td>
+                    <td>D:${pkg.max_domains} | DB:${pkg.max_databases} | E:${pkg.max_email}</td>
                     <td>
-                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete Plan</button>
+                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                     </td>
                 `;
 
@@ -1860,6 +1976,54 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (e) {}
     }
+
+    async function loadResellerAccounts() {
+        const tbody = document.querySelector('#reseller-accounts-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading managed accounts...</td></tr>';
+        try {
+            const res = await fetch('/api/reseller/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const accs = await res.json();
+            tbody.innerHTML = '';
+            accs.forEach(acc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${acc.username}</strong></td>
+                    <td>${acc.plan}</td>
+                    <td>${acc.owner}</td>
+                    <td>
+                        <button class="action-btn-secondary edit-acc-btn" data-user="${acc.username}" style="padding:2px 6px; font-size:0.75rem;">Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    document.getElementById('transfer-acc-btn').addEventListener('click', async () => {
+        const user = document.getElementById('transfer-acc-username').value;
+        const owner = document.getElementById('transfer-acc-owner').value;
+        if (!user || !owner) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/reseller/transfer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ username: user, new_owner: owner })
+            });
+            if (res.ok) {
+                showNotification(`Ownership of ${user} transferred to ${owner}.`, 'success');
+                loadResellerAccounts();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
 
     // ==========================================================================
     // 14. DYNAMIC CRON JOBS MANAGER (cPanel Mapped)
@@ -3088,6 +3252,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function boot() {
         // Just show the login page by default
         console.log("NeoCP Core Ready. Awaiting authentication...");
+    }
+
+    const installSoftBtn = document.getElementById('install-softaculous-btn');
+    if (installSoftBtn) {
+        installSoftBtn.addEventListener('click', () => {
+            addTaskIndicator();
+            showNotification('Connecting to Softaculous mirrors...', 'info');
+            setTimeout(() => {
+                showNotification('Downloading Softaculous core package...', 'info');
+                setTimeout(() => {
+                    showNotification('Softaculous library synchronized. All apps available.', 'success');
+                    removeTaskIndicator();
+                }, 2000);
+            }, 1000);
+        });
     }
 
     boot();

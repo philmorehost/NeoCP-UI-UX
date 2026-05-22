@@ -112,8 +112,8 @@
                     <li class="menu-item admin-only" data-target="clustering">
                         <span class="item-icon">🔄</span> Staging & Clustering
                     </li>
-                    <li class="menu-item admin-only" data-target="reseller">
-                        <span class="item-icon">🏢</span> Reseller Master
+                    <li class="menu-item" data-target="reseller">
+                        <span class="item-icon">🏢</span> Reseller Center
                     </li>
                     <li class="menu-item admin-only" data-target="terminal">
                         <span class="item-icon">💻</span> Visual Web Terminal
@@ -450,6 +450,7 @@
                     <div class="view-header-bar">
                         <h3>Interactive Web File Explorer</h3>
                         <div class="header-button-group">
+                            <button class="action-btn-secondary" id="filemanager-empty-trash-btn">🗑️ Empty Trash</button>
                             <button class="action-btn-secondary" id="filemanager-newfile-btn">+ New File</button>
                             <button class="action-btn-secondary" id="filemanager-newdir-btn">+ New Folder</button>
                             <button class="action-btn" id="filemanager-webdav-btn">WebDAV: Off</button>
@@ -715,7 +716,8 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <!-- VIEW 6: SOFTWARE & APPS -->
                 <div class="viewport-view" id="view-software">
                     <div class="view-header-bar">
-                        <h3>Softaculous Applications & Runtime Selectors</h3>
+                        <h3>Softaculous Full Suite & Backuply Integration</h3>
+                        <button class="action-btn" id="install-softaculous-btn">⚡ Sync Softaculous Library</button>
                     </div>
 
                     <div class="software-grid">
@@ -740,6 +742,24 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <span class="soft-version">v10.2.5</span>
                                     <button class="action-btn-secondary install-app-btn" data-app="Drupal">Install App</button>
                                 </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">Magento</span>
+                                    <h5>Magento E-com</h5>
+                                    <span class="soft-version">v2.4.7</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="Magento">Install App</button>
+                                </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">PrestaShop</span>
+                                    <h5>PrestaShop</h5>
+                                    <span class="soft-version">v8.1.5</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="PrestaShop">Install App</button>
+                                </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">Laravel</span>
+                                    <h5>Laravel Framework</h5>
+                                    <span class="soft-version">v11.x</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="Laravel">Install App</button>
+                                </div>
                             </div>
 
                             <h4 style="margin-top: 30px;">Native Language Script Managers</h4>
@@ -753,6 +773,17 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <h5>Python WSGI Config</h5>
                                     <p>Orchestrate Django/Flask execution hooks natively.</p>
                                     <button class="action-btn-secondary select-runtime-btn" data-lang="Python">Manage Python</button>
+                                </div>
+                            </div>
+
+                            <h4 style="margin-top: 30px;">Backuply — Cloud Backup Engine</h4>
+                            <div class="db-panel-card" style="background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.2);">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <h5 style="margin:0; color:#3b82f6;">Backuply Pro Active</h5>
+                                        <p style="font-size:12px; margin:5px 0;">Automated backups to AWS S3, Google Drive, and FTP nodes.</p>
+                                    </div>
+                                    <button class="action-btn" style="padding: 8px 15px; font-size:12px;">Configure Backuply</button>
                                 </div>
                             </div>
                         </div>
@@ -961,75 +992,73 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <!-- VIEW 10: RESELLER MASTER -->
                 <div class="viewport-view" id="view-reseller">
                     <div class="view-header-bar">
-                        <h3>WHM Master Reseller & WHMCS Sync Manager</h3>
+                        <h3>Reseller Center & Package Management</h3>
                     </div>
 
                     <div class="reseller-grid">
+                        <!-- Left Block: Package Creator -->
                         <div class="split-card glass">
-                            <h4>WHM Resource Package Provisioner</h4>
-                            <p class="meta-desc">Design customized subscription plans for your resellers and sub-users.</p>
-                            
+                            <h4>Create New Resource Package</h4>
                             <div class="input-group">
-                                <label>Package Package Name</label>
-                                <input type="text" id="pkg-name-input" placeholder="e.g. Silver-Pack">
+                                <label>Package Name</label>
+                                <input type="text" id="pkg-name-input" placeholder="e.g. Pro-Hosting">
                             </div>
                             <div class="ini-grid">
                                 <div class="input-group">
-                                    <label>Disk Capacity Limit (MB)</label>
-                                    <input type="number" id="pkg-disk-input" value="5000">
+                                    <label>Disk Quota (e.g. 10GB, unlimited)</label>
+                                    <input type="text" id="pkg-disk-input" value="5GB">
                                 </div>
                                 <div class="input-group">
-                                    <label>Bandwidth Limit (GB)</label>
-                                    <input type="number" id="pkg-bw-input" value="100">
+                                    <label>Monthly Bandwidth (e.g. 100GB, unlimited)</label>
+                                    <input type="text" id="pkg-bw-input" value="100GB">
                                 </div>
+                            </div>
+                            <div class="ini-grid">
                                 <div class="input-group">
                                     <label>Max Domains</label>
                                     <input type="number" id="pkg-domains-input" value="10">
                                 </div>
                                 <div class="input-group">
-                                    <label>Max Databases</label>
+                                    <label>Max SQL Databases</label>
                                     <input type="number" id="pkg-db-input" value="10">
                                 </div>
                             </div>
-                            
-                            <h5 style="margin-top: 20px;">LVE / Cgroups Resource Throttling</h5>
                             <div class="ini-grid">
                                 <div class="input-group">
-                                    <label>CPU Limit Allocation (%)</label>
-                                    <input type="number" id="pkg-cpu-input" value="50">
+                                    <label>Max FTP Accounts</label>
+                                    <input type="number" id="pkg-ftp-input" value="10">
                                 </div>
                                 <div class="input-group">
-                                    <label>Memory (RAM) Limit (MB)</label>
-                                    <input type="number" id="pkg-ram-input" value="1024">
+                                    <label>Max Email Accounts</label>
+                                    <input type="number" id="pkg-email-input" value="10">
                                 </div>
                             </div>
-                            <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy WHM Package</button>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Hourly Email Relay Limit</label>
+                                    <input type="number" id="pkg-email-relay-input" value="100">
+                                </div>
+                                <div class="input-group">
+                                    <label>Failed Message % Limit</label>
+                                    <input type="number" id="pkg-email-fail-pct-input" value="10">
+                                </div>
+                            </div>
+                            <div class="toggle-group-inline">
+                                <input type="checkbox" id="pkg-reseller-toggle">
+                                <label for="pkg-reseller-toggle">WHMReseller: Automatically elevate to Reseller</label>
+                            </div>
+                            <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy Package</button>
                         </div>
 
-                        <!-- Active Packages -->
+                        <!-- Right Block: Account Ownership & Transfer -->
                         <div class="split-card glass">
-                            <h4>Registered Billing Portals & WHMCS Active Sync</h4>
-                            <div class="db-panel-card" style="margin-bottom: 25px;">
-                                <h5>WHMCS Provisioning API Hook</h5>
-                                <p class="meta-desc">NeoCP provides an automated provisioning endpoint mapped directly into WHMCS.</p>
-                                <div class="stat-row">
-                                    <span class="stat-label">API Gateway Status:</span>
-                                    <span class="stat-val text-green" id="billing-gateway-status">Active & Bound</span>
-                                </div>
-                                <div class="stat-row">
-                                    <span class="stat-label">Provision API Endpoint:</span>
-                                    <span class="stat-val"><code>/api/v1/billing/provision</code></span>
-                                </div>
-                            </div>
-                            
-                            <h4>Registered WHM Packages</h4>
-                            <table class="neocp-data-table" id="packages-table">
+                            <h4>Managed Accounts & Ownership</h4>
+                            <table class="neocp-data-table" id="reseller-accounts-table">
                                 <thead>
                                     <tr>
-                                        <th>Plan Name</th>
-                                        <th>Disk / BW</th>
-                                        <th>Limits</th>
-                                        <th>LVE CPU/RAM</th>
+                                        <th>Username</th>
+                                        <th>Plan</th>
+                                        <th>Owner</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -1037,7 +1066,38 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <!-- Injected via JS -->
                                 </tbody>
                             </table>
+
+                            <h4 style="margin-top: 30px;">Account Ownership Transfer <span class="badge role-admin">Admin</span></h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:10px;">
+                                <div class="input-group">
+                                    <label>Target Account Username</label>
+                                    <input type="text" id="transfer-acc-username" placeholder="patel">
+                                </div>
+                                <div class="input-group">
+                                    <label>New Owner (Admin or Reseller)</label>
+                                    <input type="text" id="transfer-acc-owner" placeholder="reseller2">
+                                </div>
+                                <button class="action-btn" id="transfer-acc-btn">Execute Ownership Transfer</button>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="split-card glass" style="margin-top:25px;">
+                        <h4>Registered Packages</h4>
+                        <table class="neocp-data-table" id="packages-table">
+                            <thead>
+                                <tr>
+                                    <th>Plan Name</th>
+                                    <th>Owner</th>
+                                    <th>Disk / BW</th>
+                                    <th>Limits (D/DB/E)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -1205,13 +1265,21 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                     <label>Target Webroot Directory Path</label>
                     <input type="text" id="modal-webroot-input" placeholder="e.g. /home/patel/public_html">
                 </div>
-                <div class="input-group">
-                    <label>Assigned PHP Engine Version</label>
-                    <select id="modal-php-select" class="role-selector">
-                        <option value="8.3">PHP 8.3 (Standard)</option>
-                        <option value="8.2" selected>PHP 8.2 (Isolated)</option>
-                        <option value="8.1">PHP 8.1 (Legacy)</option>
-                    </select>
+                <div class="ini-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="input-group">
+                        <label>PHP Engine</label>
+                        <select id="modal-php-select" class="role-selector">
+                            <option value="8.3">PHP 8.3 (Standard)</option>
+                            <option value="8.2" selected>PHP 8.2 (Isolated)</option>
+                            <option value="8.1">PHP 8.1 (Legacy)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Assigned Package</label>
+                        <select id="modal-package-select" class="role-selector">
+                            <!-- Injected via JS -->
+                        </select>
+                    </div>
                 </div>
                 <div class="toggle-group-inline">
                     <input type="checkbox" id="modal-ssl-toggle" checked>
