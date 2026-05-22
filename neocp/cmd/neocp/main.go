@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"context"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -25,6 +26,10 @@ import (
 
 	"neocp/internal/api"
 	"neocp/internal/core"
+	"neocp/internal/core/ai"
+	"neocp/internal/core/cms"
+	"neocp/internal/core/gitops"
+	"neocp/internal/api/public"
 	"neocp/internal/core/uzme"
 	"neocp/internal/oslayer"
 )
@@ -117,6 +122,8 @@ func main() {
 	mux.Handle("/api/domains/dns/security", api.RequireRole("admin")(http.HandlerFunc(handleDNSSecurity)))
 	mux.Handle("/api/domains/waf", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDomainWAF)))
 	mux.Handle("/api/domains/nginx/clearcache", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainClearNginxCache)))
+	mux.Handle("/api/domains/git/deploy", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainGitDeploy)))
+	mux.Handle("/api/cms/wp/harden", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleWPHarden)))
 
 	// Database endpoints
 	mux.Handle("/api/databases", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDatabases)))
@@ -169,6 +176,7 @@ func main() {
 	mux.Handle("/api/security/firewall/blocks", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallBlocks)))
 	mux.Handle("/api/security/firewall/block", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallBlock)))
 	mux.Handle("/api/security/firewall/unblock", api.RequireRole("admin")(http.HandlerFunc(api.HandleFirewallUnblock)))
+	mux.Handle("/api/security/ai/analyze", api.RequireRole("admin")(http.HandlerFunc(handleAISecurityAnalysis)))
 
 	// Backup Engine endpoints
 	mux.Handle("/api/backup/create", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +193,9 @@ func main() {
 	mux.Handle("/api/staging", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.HandleStaging(w, r, sandboxDir)
 	})))
+
+	// Public Provisioning API (OpenAPI 3.0)
+	mux.HandleFunc("/api/v1/swagger.json", public.SwaggerSpec)
 
 	// Clustering endpoints
 	mux.Handle("/api/cluster/nodes", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
@@ -346,6 +357,46 @@ func handleAccountDetail(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(acc)
+}
+
+func handleDomainGitDeploy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		DomainName string         `json:"domain_name"`
+		Config     core.GitConfig `json:"config"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// If config is provided, update it first
+	db := core.GetDB()
+	if req.Config.RepoURL != "" {
+		_ = db.UpdateDomainGit(req.DomainName, req.Config)
+	} else {
+		// Fetch existing
+		domains := db.GetDomains(r.Header.Get("NeoCP-User"), true)
+		for _, d := range domains {
+			if d.DomainName == req.DomainName {
+				req.Config = d.GitOps
+				break
+			}
+		}
+	}
+
+	if req.Config.RepoURL == "" {
+		http.Error(w, "Git not configured for this domain", http.StatusBadRequest)
+		return
+	}
+
+	go gitops.DeployFromGit(context.Background(), req.DomainName, req.Config, sandboxDir)
+
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"success":true, "message": "Git deployment initiated"}`))
 }
 
 func handleDomainClearNginxCache(w http.ResponseWriter, r *http.Request) {
@@ -1798,4 +1849,46 @@ func generateSelfSignedCert(certPath, keyPath string) error {
 	}
 
 	return nil
+}
+
+func handleWPHarden(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Path     string          `json:"path"`
+		Settings []cms.WPSetting `json:"settings"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	err := cms.HardenWordPress(r.Context(), req.Path, req.Settings)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "message": "WordPress hardening applied"}`))
+}
+
+func handleAISecurityAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Simulation: Fetch recent logs from database or files
+	dummyLogs := []string{
+		"auth: login failed for user root from 192.168.1.5",
+		"nginx: 504 Gateway Timeout for blog.digitalneo.net",
+	}
+
+	suggestions := ai.AnalyzeLogs(r.Context(), dummyLogs)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(suggestions)
 }

@@ -55,6 +55,16 @@ type WAFPolicy struct {
 	CSRFHeader bool `json:"csrf_header"`
 }
 
+type GitConfig struct {
+	RepoURL    string    `json:"repo_url"`
+	Branch     string    `json:"branch"`
+	Path       string    `json:"path"` // Deployment path relative to home
+	SSHKeyName string    `json:"ssh_key_name"`
+	WebhookID  string    `json:"webhook_id"`
+	LastDeploy time.Time `json:"last_deploy"`
+	DeployLog  []string  `json:"deploy_log"`
+}
+
 type Domain struct {
 	DomainName           string      `json:"domain_name"`
 	Owner                string      `json:"owner"`
@@ -73,6 +83,7 @@ type Domain struct {
 	BrotliEnabled        bool        `json:"brotli_enabled"`
 	DNSRecords           []DNSRecord `json:"dns_records"`
 	WAFPolicy            WAFPolicy   `json:"waf_policy"`
+	GitOps               GitConfig   `json:"git_ops"`
 	CreatedAt            time.Time   `json:"created_at"`
 }
 
@@ -190,6 +201,13 @@ type MigrationTask struct {
 }
 
 // DatabaseStore manages the raw file payload with thread-safety
+type SSHKey struct {
+	Name      string    `json:"name"`
+	PublicKey string    `json:"public_key"`
+	Owner     string    `json:"owner"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type DatabaseStore struct {
 	Accounts         map[string]Account         `json:"accounts"`
 	Domains          map[string]Domain          `json:"domains"`
@@ -201,6 +219,7 @@ type DatabaseStore struct {
 	MigrationTasks   map[string]MigrationTask   `json:"migration_tasks"`
 	FirewallBlocks   map[string]FirewallBlock   `json:"firewall_blocks"`
 	ClusterNodes     map[string]ClusterNode     `json:"cluster_nodes"`
+	SSHKeys          map[string]SSHKey          `json:"ssh_keys"`
 	IPAddresses      []IPAddress                `json:"ip_addresses"`
 	Server           ServerConfig               `json:"server"`
 }
@@ -232,6 +251,7 @@ func GetDB() *DatabaseEngine {
 				MigrationTasks:   make(map[string]MigrationTask),
 				FirewallBlocks:   make(map[string]FirewallBlock),
 				ClusterNodes:     make(map[string]ClusterNode),
+				SSHKeys:          make(map[string]SSHKey),
 			},
 		}
 		engineInstance.load()
@@ -280,6 +300,9 @@ func (db *DatabaseEngine) load() {
 		}
 		if loaded.ClusterNodes != nil {
 			db.store.ClusterNodes = loaded.ClusterNodes
+		}
+		if loaded.SSHKeys != nil {
+			db.store.SSHKeys = loaded.SSHKeys
 		}
 	}
 }
@@ -1315,6 +1338,39 @@ func (db *DatabaseEngine) UpdateClusterNodeStatus(nodeID string, active bool) er
 	}
 	node.IsActive = active
 	db.store.ClusterNodes[nodeID] = node
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetSSHKeys(owner string) []SSHKey {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	var keys []SSHKey
+	for _, k := range db.store.SSHKeys {
+		if k.Owner == owner {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+func (db *DatabaseEngine) CreateSSHKey(key SSHKey) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.store.SSHKeys[key.Name] = key
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) UpdateDomainGit(domainName string, git GitConfig) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	dom, exists := db.store.Domains[domainName]
+	if !exists {
+		return errors.New("domain not found")
+	}
+	dom.GitOps = git
+	db.store.Domains[domainName] = dom
 	db.save()
 	return nil
 }

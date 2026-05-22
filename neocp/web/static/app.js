@@ -184,6 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetViewId === 'ipmanager') {
             loadIPPool();
         }
+        if (targetViewId === 'fleet') {
+            // Load global fleet data
+        }
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
@@ -603,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="action-btn-secondary convert-account-btn" data-domain="${dom.domain_name}" data-owner="${dom.owner}" style="padding: 4px 8px; font-size: 0.75rem;">Decouple</button>
                             <button class="action-btn-secondary toggle-staging-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Staging</button>
                             <button class="action-btn-secondary ssl-issue-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Issue SSL</button>
+                            <button class="action-btn-secondary git-deploy-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Git Deploy</button>
                             <button class="action-btn-secondary redirect-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Redirect</button>
                             <button class="action-btn-secondary delete-domain-btn text-red" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                         </div>
@@ -719,6 +723,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', async (e) => {
                     const dom = e.target.getAttribute('data-domain');
                     await issueLetsEncryptSSL(dom);
+                });
+            });
+
+            // Git Deploy actions
+            document.querySelectorAll('.git-deploy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const dom = btn.getAttribute('data-domain');
+                    launchGitDeployModal(dom);
                 });
             });
 
@@ -924,6 +936,75 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             removeTaskIndicator();
         }
+    }
+
+    function launchGitDeployModal(domainName) {
+        const dom = cachedDomains.find(d => d.domain_name === domainName);
+        const config = dom.git_ops || {};
+
+        const overlay = document.createElement('div');
+        overlay.className = 'neocp-modal-backdrop active';
+        overlay.innerHTML = `
+            <div class="neocp-modal-card glass" style="width: 500px;">
+                <div class="modal-header">
+                    <h4>GitOps Push-to-Deploy: ${domainName}</h4>
+                    <button class="modal-close-btn close-git-modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label>Repository URL (HTTPS or SSH)</label>
+                        <input type="text" id="git-repo-url" value="${config.repo_url || ''}" placeholder="https://github.com/user/repo.git">
+                    </div>
+                    <div class="input-group">
+                        <label>Branch</label>
+                        <input type="text" id="git-branch" value="${config.branch || 'main'}" placeholder="main">
+                    </div>
+                    <div class="input-group">
+                        <label>Deployment Path (Relative to home)</label>
+                        <input type="text" id="git-path" value="${config.path || ''}" placeholder="public_html/${domainName}">
+                    </div>
+
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                        <h6 style="margin:0 0 10px 0;">Webhook URL</h6>
+                        <code style="font-size:11px; word-break:break-all;">https://neocp.io/api/webhooks/git/${domainName}</code>
+                        <p style="font-size:10px; margin-top:5px; color:var(--text-muted);">Add this URL to your GitHub/GitLab repository settings to trigger auto-deploy.</p>
+                    </div>
+
+                    <button class="action-btn" id="save-git-deploy-btn" style="width:100%; margin-top:20px;">⚡ Save & Trigger Initial Deploy</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('.close-git-modal').addEventListener('click', () => overlay.remove());
+
+        document.getElementById('save-git-deploy-btn').addEventListener('click', async () => {
+            const repo_url = document.getElementById('git-repo-url').value;
+            const branch = document.getElementById('git-branch').value;
+            const path = document.getElementById('git-path').value;
+
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/domains/git/deploy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({
+                        domain_name: domainName,
+                        config: { repo_url, branch, path }
+                    })
+                });
+                if (res.ok) {
+                    showNotification('GitOps configuration saved. Deployment worker started.', 'success');
+                    overlay.remove();
+                    loadDomainsTable();
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
     }
 
     async function deleteDomainSpace(domain) {
@@ -1469,6 +1550,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const blockedIps = document.getElementById('blocked-ips-count');
     const logBox = document.getElementById('cphulk-log-box');
 
+    const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
+    if (aiAnalyzeBtn) {
+        aiAnalyzeBtn.addEventListener('click', async () => {
+            const container = document.getElementById('ai-suggestions-container');
+            container.innerHTML = '<div class="text-muted" style="text-align: center; padding: 20px;">🤖 AI Guardian is processing system buffers...</div>';
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/security/ai/analyze', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const suggestions = await res.json();
+                container.innerHTML = '';
+                if (suggestions.length === 0) {
+                    container.innerHTML = '<div class="text-muted" style="text-align: center; padding: 20px;">No critical issues identified. System is optimized.</div>';
+                    return;
+                }
+                suggestions.forEach(s => {
+                    const div = document.createElement('div');
+                    div.style.background = 'rgba(255,255,255,0.03)';
+                    div.style.padding = '15px';
+                    div.style.borderRadius = '8px';
+                    div.style.borderLeft = `4px solid ${s.type === 'security' ? '#ef4444' : '#38bdf8'}`;
+                    div.innerHTML = `
+                        <strong style="display:block; margin-bottom:5px; text-transform:uppercase; font-size:10px; color:${s.type === 'security' ? '#ef4444' : '#38bdf8'};">${s.type} Suggestion</strong>
+                        <p style="font-size:13px; margin:0 0 12px 0;">${s.message}</p>
+                        <button class="action-btn-secondary" style="padding:4px 10px; font-size:11px; border-color:${s.type === 'security' ? '#ef4444' : '#38bdf8'}; color:${s.type === 'security' ? '#ef4444' : '#38bdf8'};">${s.action_label}</button>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
     // Real-time Malware Scanner Simulation
     setInterval(() => {
         const paths = ['/public_html/index.php', '/public_html/wp-config.php', '/.env', '/mail/inbox'];
@@ -1520,6 +1636,97 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // 9. SOFTACULOUS APP AUTODEPLOYERS & PHP.INI SETTINGS
     // ==========================================================================
+    document.querySelectorAll('.install-app-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const app = e.target.getAttribute('data-app');
+            // If WordPress, show toolkit option
+            if (app === 'WordPress') {
+                launchWPToolkitModal();
+            } else {
+                triggerStandardAppInstall(app);
+            }
+        });
+    });
+
+    function triggerStandardAppInstall(app) {
+        addTaskIndicator();
+        showNotification(`[Backuply] Taking pre-install backup of target domain...`, 'info');
+        setTimeout(() => {
+            showNotification(`Softaculous: Downloading ${app} binaries...`, 'info');
+            setTimeout(() => {
+                showNotification(`Softaculous: Creating MySQL database for ${app}...`, 'success');
+                setTimeout(() => {
+                    showNotification(`${app} installed and active! Database credentials mailed.`, 'success');
+                    removeTaskIndicator();
+                    loadFileExplorer();
+                }, 1500);
+            }, 1000);
+        }, 800);
+    }
+
+    function launchWPToolkitModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'neocp-modal-backdrop active';
+        overlay.innerHTML = `
+            <div class="neocp-modal-card glass" style="width: 550px;">
+                <div class="modal-header">
+                    <h4>NeoCP WP Toolkit — CMS Lifecycle Manager</h4>
+                    <button class="modal-close-btn close-wp-modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                        <div class="db-panel-card" style="text-align:center;">
+                            <h5 style="margin:0 0 5px 0;">Version</h5>
+                            <span class="status-badge badge-green">v6.5.3 (Up to date)</span>
+                        </div>
+                        <div class="db-panel-card" style="text-align:center;">
+                            <h5 style="margin:0 0 5px 0;">Security</h5>
+                            <span class="status-badge badge-orange">Medium Hardened</span>
+                        </div>
+                    </div>
+
+                    <h5 style="margin-bottom:10px;">Security Hardening Matrix</h5>
+                    <div style="display:flex; flex-direction:column; gap:10px; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Disable XML-RPC API</span>
+                            <input type="checkbox" id="wp-harden-xmlrpc" checked>
+                        </label>
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Hide WP-Login (Move to /portal)</span>
+                            <input type="checkbox" id="wp-harden-login">
+                        </label>
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Disable File Editing in Panel</span>
+                            <input type="checkbox" id="wp-harden-fileedit" checked>
+                        </label>
+                    </div>
+
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button class="action-btn" id="wp-apply-harden-btn" style="flex:2;">🛡️ Apply Hardening</button>
+                        <button class="action-btn-secondary" id="wp-bulk-update-btn" style="flex:1;">🔄 Update All</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.close-wp-modal').addEventListener('click', () => overlay.remove());
+
+        document.getElementById('wp-apply-harden-btn').addEventListener('click', async () => {
+            addTaskIndicator();
+            showNotification('WP Toolkit: Rewriting wp-config.php and .htaccess...', 'info');
+            setTimeout(() => {
+                showNotification('WordPress security policy enforced successfully.', 'success');
+                removeTaskIndicator();
+                overlay.remove();
+            }, 1500);
+        });
+
+        document.getElementById('wp-bulk-update-btn').addEventListener('click', () => {
+            showNotification('WP Toolkit: Initiating bulk core/plugin update across all domains...', 'info');
+            overlay.remove();
+        });
+    }
+
     document.querySelectorAll('.install-app-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const app = e.target.getAttribute('data-app');
@@ -3460,24 +3667,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.querySelectorAll('.install-app-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const app = e.target.getAttribute('data-app');
-            addTaskIndicator();
-            showNotification(`[Backuply] Taking pre-install backup of target domain...`, 'info');
-            setTimeout(() => {
-                showNotification(`Softaculous: Downloading ${app} binaries...`, 'info');
-                setTimeout(() => {
-                    showNotification(`Softaculous: Creating MySQL database for ${app}...`, 'success');
-                    setTimeout(() => {
-                        showNotification(`${app} installed and active! Database credentials mailed.`, 'success');
-                        removeTaskIndicator();
-                        loadFileExplorer();
-                    }, 1500);
-                }, 1000);
-            }, 800);
-        });
-    });
 
     boot();
 });

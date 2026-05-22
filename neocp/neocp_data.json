@@ -24,7 +24,7 @@
       "nameservers": null,
       "locale": "",
       "shell_access": false,
-      "created_at": "2026-05-22T14:10:54.536429421Z"
+      "created_at": "2026-05-22T17:22:55.257056298Z"
     },
     "patel": {
       "username": "patel",
@@ -50,7 +50,7 @@
       "nameservers": null,
       "locale": "",
       "shell_access": false,
-      "created_at": "2026-05-22T14:10:54.536432151Z"
+      "created_at": "2026-05-22T17:22:55.257057857Z"
     },
     "reseller1": {
       "username": "reseller1",
@@ -76,7 +76,7 @@
       "nameservers": null,
       "locale": "",
       "shell_access": false,
-      "created_at": "2026-05-22T14:10:54.536431698Z"
+      "created_at": "2026-05-22T17:22:55.257057471Z"
     }
   },
   "domains": {
@@ -90,7 +90,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-06T14:10:54.536432349Z",
+      "ssl_expires": "2026-08-06T17:22:55.257058036Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -103,7 +103,16 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-04-22T14:10:54.536917536Z"
+      "git_ops": {
+        "repo_url": "",
+        "branch": "",
+        "path": "",
+        "ssh_key_name": "",
+        "webhook_id": "",
+        "last_deploy": "0001-01-01T00:00:00Z",
+        "deploy_log": null
+      },
+      "created_at": "2026-04-22T17:22:55.257109487Z"
     },
     "shop.digitalneo.net": {
       "domain_name": "shop.digitalneo.net",
@@ -115,7 +124,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-07-20T14:10:54.536918919Z",
+      "ssl_expires": "2026-07-20T17:22:55.257119476Z",
       "webdav_enabled": true,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -128,7 +137,16 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-12T14:10:54.536919043Z"
+      "git_ops": {
+        "repo_url": "",
+        "branch": "",
+        "path": "",
+        "ssh_key_name": "",
+        "webhook_id": "",
+        "last_deploy": "0001-01-01T00:00:00Z",
+        "deploy_log": null
+      },
+      "created_at": "2026-05-12T17:22:55.257119669Z"
     }
   },
   "databases": {
@@ -138,7 +156,7 @@
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-22T14:10:54.53692065Z"
+      "created_at": "2026-05-22T17:22:55.257120624Z"
     }
   },
   "cron_jobs": {
@@ -149,7 +167,7 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-22T14:10:54.536976654Z"
+      "created_at": "2026-05-22T17:22:55.257121081Z"
     },
     "cron_system_scan": {
       "id": "cron_system_scan",
@@ -158,7 +176,7 @@
       "command": "/usr/local/neocp/bin/scan-server --full",
       "schedule": "0 3 * * 0",
       "active": true,
-      "created_at": "2026-05-22T14:10:54.536985363Z"
+      "created_at": "2026-05-22T17:22:55.257128225Z"
     },
     "cron_trash_purge": {
       "id": "cron_trash_purge",
@@ -167,7 +185,7 @@
       "command": "/usr/local/neocp/bin/purge-trash --days 30",
       "schedule": "0 4 * * *",
       "active": true,
-      "created_at": "2026-05-22T14:10:54.53698565Z"
+      "created_at": "2026-05-22T17:22:55.257128403Z"
     }
   },
   "reseller_packages": {
@@ -193,7 +211,7 @@
       "shell_access": false,
       "cgi_access": false,
       "digest_auth": false,
-      "created_at": "2026-05-22T14:10:54.536920267Z"
+      "created_at": "2026-05-22T17:22:55.257120382Z"
     },
     "Premium-Personal": {
       "name": "Premium-Personal",
@@ -217,7 +235,7 @@
       "shell_access": false,
       "cgi_access": false,
       "digest_auth": false,
-      "created_at": "2026-05-22T14:10:54.536919458Z"
+      "created_at": "2026-05-22T17:22:55.257119993Z"
     }
   },
   "tickets": {
@@ -231,21 +249,22 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-22T12:10:54.536985892Z"
+          "timestamp": "2026-05-22T15:22:55.257128525Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-22T13:10:54.536986035Z"
+          "timestamp": "2026-05-22T16:22:55.257128666Z"
         }
       ],
-      "created_at": "2026-05-22T12:10:54.536986163Z"
+      "created_at": "2026-05-22T15:22:55.257128778Z"
     }
   },
   "docker_containers": {},
   "migration_tasks": {},
   "firewall_blocks": {},
   "cluster_nodes": {},
+  "ssh_keys": {},
   "ip_addresses": [
     {
       "ip": "192.168.1.100",

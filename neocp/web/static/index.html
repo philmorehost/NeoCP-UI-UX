@@ -105,6 +105,9 @@
                     <li class="menu-item admin-only" data-target="ipmanager">
                         <span class="item-icon">🌐</span> IP Delegation
                     </li>
+                    <li class="menu-item admin-only" data-target="fleet">
+                        <span class="item-icon">📡</span> Fleet Command
+                    </li>
                 </ul>
 
                 <div class="menu-section">Enterprise Ecosystem</div>
@@ -562,6 +565,23 @@
                         <h3>Security Center Hardening Console</h3>
                     </div>
 
+                    <div class="split-card glass admin-only" id="ai-guardian-section" style="margin-bottom: 25px; border: 1px solid rgba(56, 189, 248, 0.2); background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="color: #38bdf8; display:flex; align-items:center; gap:10px;">
+                                <span style="font-size: 20px;">🤖</span> NeoCP AI Guardian — Intelligent Diagnostics
+                            </h4>
+                            <button class="action-btn" id="ai-analyze-btn" style="padding: 8px 15px; font-size:12px; background: #38bdf8; color: #0f172a;">⚡ Scan System Logs</button>
+                        </div>
+                        <p class="meta-desc" style="margin-top: 5px;">AI Guardian analyzes global server logs and suggests proactive security or performance hardening measures.</p>
+
+                        <div id="ai-suggestions-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-top: 20px;">
+                            <!-- Suggestions injected via JS -->
+                            <div class="text-muted" style="text-align: center; padding: 20px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px;">
+                                Click "Scan System Logs" to begin deep-learning diagnostics.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="security-grid">
                         <div class="split-card glass">
                             <h4>WAF (ModSecurity) Orchestration</h4>
@@ -1004,6 +1024,80 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                 <div class="text-muted" style="text-align: center; padding: 20px;">No remote nodes attached.</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: FLEET COMMAND -->
+                <div class="viewport-view" id="view-fleet">
+                    <div class="view-header-bar">
+                        <h3>NeoCP Fleet Command — Global Cluster Analytics</h3>
+                        <button class="action-btn">🔗 Register Remote Cluster</button>
+                    </div>
+
+                    <div class="split-card glass" style="margin-bottom: 25px; border: 1px solid var(--accent-blue); background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(59,130,246,0.05) 100%);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h4 style="color:var(--accent-blue);">US-EAST-1 Cluster (Active)</h4>
+                                <span class="text-muted" style="font-size:12px;">Global Master Endpoint: 45.21.90.111</span>
+                            </div>
+                            <div style="text-align:right;">
+                                <span class="status-badge badge-green">HEALTHY</span>
+                                <div class="text-muted" style="font-size:10px; margin-top:4px;">14 Workers Connected</div>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px; margin-top:20px;">
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">🌐</span>
+                                <h5 style="margin:5px 0;">342</h5>
+                                <span class="text-muted" style="font-size:10px;">TOTAL DOMAINS</span>
+                            </div>
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">🔋</span>
+                                <h5 style="margin:5px 0;">28%</h5>
+                                <span class="text-muted" style="font-size:10px;">AVG CPU LOAD</span>
+                            </div>
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">📦</span>
+                                <h5 style="margin:5px 0;">1.2 TB</h5>
+                                <span class="text-muted" style="font-size:10px;">DISK ALLOCATED</span>
+                            </div>
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">💸</span>
+                                <h5 style="margin:5px 0;">$4.2k</h5>
+                                <span class="text-muted" style="font-size:10px;">EST. MRR</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-card glass">
+                        <h4>Fleet-wide Service Integrity</h4>
+                        <table class="neocp-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cluster Region</th>
+                                    <th>Node ID</th>
+                                    <th>Service Health</th>
+                                    <th>Traffic I/O</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>EU-WEST-2 (London)</strong></td>
+                                    <td><code>node-782</code></td>
+                                    <td><span class="status-badge badge-green">Running</span></td>
+                                    <td>45.2 MB/s</td>
+                                    <td><button class="action-btn-secondary" style="padding:4px 8px; font-size:11px;">Remote Console</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AP-SOUTH-1 (Mumbai)</strong></td>
+                                    <td><code>node-104</code></td>
+                                    <td><span class="status-badge badge-red">Latency Alert</span></td>
+                                    <td>1.2 MB/s</td>
+                                    <td><button class="action-btn-secondary" style="padding:4px 8px; font-size:11px;">Analyze Logs</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
