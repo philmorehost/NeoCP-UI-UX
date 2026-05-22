@@ -1,9 +1,9 @@
 ; BIND9 Zone File for blog.digitalneo.net (Compiled by NeoCP Core Engine)
-; Compiled At: Thu, 21 May 2026 23:27:01 UTC
+; Compiled At: Fri, 22 May 2026 14:09:05 UTC
 
 $TTL 86400
 @   IN  SOA  ns1.neocp.io. admin.neocp.io. (
-              2026052101 ; Serial
+              2026052201 ; Serial
               3600       ; Refresh
               1800       ; Retry
               604800     ; Expire
@@ -14,3 +14,6 @@ $TTL 86400
 @   IN  NS  ns2.neocp.io.
 
 ; Active Resource Records
+default._domainkey 3600   IN  TXT   "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsbt2J6mvOtQo/bfbYXq9kvnoE2MagB7ChwPZlKfkBcuKzOaY0hAGnK15RIZGLolGnUJCGXSdR7D5slQTWTA0W6bOMf9Bighj458XV4I2GUkBTpO/1NpP1ZhSEyapq8uKiSeaSHjc9WkcsPcppHPYDmQ7qdEz/WQZzTCB5JyFnWdzSbvQVOEqUHCFpLMWDoH+3WAyOeiiSH+1hvlJsST2LGZVs5YAj0HHDgwScHtGsYuBE6AMxjqxG4oWiPPm6Mo/PKylkCPFQZUcwdzn9bniw8ToTIWxz71lEock8S/nP4i0+XeJBqIkPnD4FyjC27ujdGa5KPUSHA5sCb1/TFjizQIDAQAB"
+@                3600   IN  TXT   "v=spf1 ip4:192.168.1.100 +a +mx +include:_spf.google.com ~all"
+_dmarc           3600   IN  TXT   "v=DMARC1; p=quarantine; rua=mailto:admin@blog.digitalneo.net"

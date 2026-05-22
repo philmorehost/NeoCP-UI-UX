@@ -181,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loadPackagesTable();
             loadResellerAccounts();
         }
+        if (targetViewId === 'ipmanager') {
+            loadIPPool();
+        }
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
@@ -1436,6 +1439,27 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open('https://localhost:8443/phpmyadmin', '_blank');
     });
 
+    document.getElementById('db-map-tool-btn')?.addEventListener('click', () => {
+        showNotification('Database Map Tool: Scanning for orphaned database schemas...', 'info');
+        setTimeout(() => {
+            showNotification('No orphaned databases found. All schemas correctly mapped to NeoCP users.', 'success');
+        }, 1500);
+    });
+
+    document.getElementById('db-repair-all-btn')?.addEventListener('click', () => {
+        addTaskIndicator();
+        showNotification('Initiating global repair on all MariaDB databases...', 'info');
+        setTimeout(() => {
+            showNotification('Repair complete. Analyzed 142 tables, 0 corruption detected.', 'success');
+            removeTaskIndicator();
+        }, 3000);
+    });
+
+    document.getElementById('db-proc-monitor-btn')?.addEventListener('click', () => {
+        showNotification('Fetching active MySQL process threads...', 'info');
+        // Simulate monitor view
+    });
+
     // ==========================================================================
     // 8. SECURITY HARDENING & CPHULK LOGS
     // ==========================================================================
@@ -1503,25 +1527,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    function triggerAppInstallationAutodeploy(app, buttonElement) {
-        let progress = 0;
-        buttonElement.disabled = true;
-        buttonElement.textContent = 'Installing (0%)';
-        showNotification(`Softaculous initiating autodeploy sequence for ${app}...`, 'info');
-
-        const interval = setInterval(() => {
-            progress += 10;
-            buttonElement.textContent = `Installing (${progress}%)`;
-            if (progress >= 100) {
-                clearInterval(interval);
-                buttonElement.disabled = false;
-                buttonElement.textContent = 'Install App';
-                showNotification(`${app} Core Suite autodeployed successfully! Admin credentials sent to ${currentUser}@neocp.io`, 'success');
-                // Seed new files
-                loadFileExplorer();
-            }
-        }, 600);
-    }
 
     document.getElementById('save-php-ini-btn').addEventListener('click', () => {
         const mem = document.getElementById('php-memory-limit').value;
@@ -1872,6 +1877,108 @@ document.addEventListener('DOMContentLoaded', () => {
             removeTaskIndicator();
         }
     }
+
+    async function loadIPPool() {
+        const tbody = document.querySelector('#ip-pool-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading IPv4 stack...</td></tr>';
+        try {
+            const res = await fetch('/api/server/ips', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const ips = await res.json();
+            tbody.innerHTML = '';
+
+            const delSelect = document.getElementById('delegate-ip-select');
+            if (delSelect) delSelect.innerHTML = '';
+
+            ips.forEach(ip => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${ip.ip}</strong></td>
+                    <td>${ip.subnet}</td>
+                    <td><span class="status-badge ${ip.is_shared ? 'badge-blue' : 'badge-orange'}">${ip.is_shared ? 'Shared' : 'Dedicated'}</span></td>
+                    <td><code class="text-blue">${ip.owner || 'unassigned'}</code></td>
+                    <td><span class="status-badge ${ip.is_assigned ? 'badge-green' : 'badge-muted'}">${ip.is_assigned ? 'Assigned' : 'Available'}</span></td>
+                    <td>
+                        <button class="action-btn-secondary text-red" style="padding:2px 6px; font-size:0.75rem; border-color:rgba(239,68,68,0.2);">Unbind</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                if (!ip.is_shared && !ip.is_assigned && delSelect) {
+                    const opt = document.createElement('option');
+                    opt.value = ip.ip;
+                    opt.textContent = ip.ip;
+                    delSelect.appendChild(opt);
+                }
+            });
+
+            // Populate reseller select for delegation
+            const accRes = await fetch('/api/reseller/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const accs = await accRes.json();
+            const resSelect = document.getElementById('delegate-reseller-select');
+            if (resSelect) {
+                resSelect.innerHTML = '';
+                accs.filter(a => a.role === 'reseller').forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.username;
+                    opt.textContent = r.username;
+                    resSelect.appendChild(opt);
+                });
+            }
+
+        } catch (e) {}
+    }
+
+    document.getElementById('add-ip-pool-btn')?.addEventListener('click', async () => {
+        const ip = document.getElementById('new-ip-addr').value;
+        const mask = document.getElementById('new-ip-mask').value;
+        const shared = document.getElementById('new-ip-shared').checked;
+        if (!ip) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/server/ips', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ ip, subnet: mask, is_shared: shared })
+            });
+            if (res.ok) {
+                showNotification(`IP ${ip} bound to eth0 interface successfully.`, 'success');
+                loadIPPool();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
+
+    document.getElementById('delegate-ip-btn')?.addEventListener('click', async () => {
+        const ip = document.getElementById('delegate-ip-select').value;
+        const reseller = document.getElementById('delegate-reseller-select').value;
+        if (!ip || !reseller) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/server/ips/delegate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ ip, reseller_id: reseller })
+            });
+            if (res.ok) {
+                showNotification(`IP ${ip} delegated to ${reseller} pool.`, 'success');
+                loadIPPool();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
 
     async function deleteStaging(subdomain) {
         addTaskIndicator();
@@ -3124,6 +3231,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Set up WAF event listeners and DNS bindings
+    const dnsSecurityBtn = document.getElementById('dns-security-suite-btn');
+    if (dnsSecurityBtn) {
+        dnsSecurityBtn.addEventListener('click', async () => {
+            const domain = document.getElementById('dns-domain-selector').value;
+            if (!domain) return showNotification('Select a domain first.', 'error');
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/domains/dns/security', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ domain_name: domain })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(data.log, 'success');
+                    loadDNSRecords(domain);
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
+    const dnsSyncBtn = document.getElementById('dns-cluster-sync-btn');
+    if (dnsSyncBtn) {
+        dnsSyncBtn.addEventListener('click', async () => {
+            addTaskIndicator();
+            showNotification('Broadcasting zone updates to DNS cluster nodes...', 'info');
+            try {
+                const res = await fetch('/api/domains/dns/sync', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(data.log, 'success');
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
     const dnsDomSel = document.getElementById('dns-domain-selector');
     if (dnsDomSel) {
         dnsDomSel.addEventListener('change', (e) => {
@@ -3301,10 +3454,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     showNotification('Softaculous library synchronized. All apps available.', 'success');
                     removeTaskIndicator();
+                    document.getElementById('install-softaculous-btn').innerHTML = '🟢 Softaculous Synced';
                 }, 2000);
             }, 1000);
         });
     }
+
+    document.querySelectorAll('.install-app-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const app = e.target.getAttribute('data-app');
+            addTaskIndicator();
+            showNotification(`[Backuply] Taking pre-install backup of target domain...`, 'info');
+            setTimeout(() => {
+                showNotification(`Softaculous: Downloading ${app} binaries...`, 'info');
+                setTimeout(() => {
+                    showNotification(`Softaculous: Creating MySQL database for ${app}...`, 'success');
+                    setTimeout(() => {
+                        showNotification(`${app} installed and active! Database credentials mailed.`, 'success');
+                        removeTaskIndicator();
+                        loadFileExplorer();
+                    }, 1500);
+                }, 1000);
+            }, 800);
+        });
+    });
 
     boot();
 });

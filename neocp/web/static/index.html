@@ -102,6 +102,9 @@
                     <li class="menu-item admin-only" data-target="system">
                         <span class="item-icon">📈</span> Telemetry & Processes
                     </li>
+                    <li class="menu-item admin-only" data-target="ipmanager">
+                        <span class="item-icon">🌐</span> IP Delegation
+                    </li>
                 </ul>
 
                 <div class="menu-section">Enterprise Ecosystem</div>
@@ -374,11 +377,15 @@
                     <div class="domains-list-card glass" style="margin-top: 25px;">
                         <div class="view-header-bar" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 20px;">
                             <h4>DNS Zone File Editor (BIND9 Compiler)</h4>
-                            <div class="input-inline" style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-size: 13px; color: rgba(255,255,255,0.7);">Active Domain Zone:</span>
-                                <select id="dns-domain-selector" class="role-selector" style="width: auto; padding: 6px 12px; height: auto;">
-                                    <option value="">-- Choose Domain --</option>
-                                </select>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <button class="action-btn-secondary admin-only" id="dns-security-suite-btn" style="padding: 6px 12px; font-size:12px;">🛡️ Enable DKIM/SPF/DMARC</button>
+                                <button class="action-btn-secondary admin-only" id="dns-cluster-sync-btn" style="padding: 6px 12px; font-size:12px;">🔄 Sync Cluster</button>
+                                <div class="input-inline" style="display: flex; align-items: center; gap: 10px; margin:0;">
+                                    <span style="font-size: 13px; color: rgba(255,255,255,0.7);">Active Domain Zone:</span>
+                                    <select id="dns-domain-selector" class="role-selector" style="width: auto; padding: 6px 12px; height: auto;">
+                                        <option value="">-- Choose Domain --</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         
@@ -523,7 +530,18 @@
                                 <div class="db-panel-card">
                                     <h5>Quick Admin Access</h5>
                                     <p>Run administrative operations on database schemas, tables, and permissions instantly.</p>
-                                    <button class="action-btn-w-100" id="open-phpmyadmin-btn">⚡ Launch phpMyAdmin Interface</button>
+                                    <div style="display:flex; gap:10px;">
+                                        <button class="action-btn" id="open-phpmyadmin-btn" style="flex:1;">⚡ Launch phpMyAdmin</button>
+                                        <button class="action-btn-secondary admin-only" id="db-map-tool-btn" style="flex:1;">🗺️ Database Map Tool</button>
+                                    </div>
+                                </div>
+                                <div class="db-panel-card admin-only">
+                                    <h5>System Maintenance</h5>
+                                    <p>Repair corruption or monitor active MySQL process threads.</p>
+                                    <div style="display:flex; gap:10px;">
+                                        <button class="action-btn-secondary" id="db-repair-all-btn">🔧 Repair All Databases</button>
+                                        <button class="action-btn-secondary" id="db-proc-monitor-btn">📊 MySQL Process Monitor</button>
+                                    </div>
                                 </div>
                                 <div class="db-panel-card">
                                     <h5>Remote Database Access Configuration</h5>
@@ -984,6 +1002,70 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                             <div class="cluster-nodes-list" id="cluster-nodes-container">
                                 <!-- Clusters injected via JS -->
                                 <div class="text-muted" style="text-align: center; padding: 20px;">No remote nodes attached.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: IP MANAGEMENT -->
+                <div class="viewport-view" id="view-ipmanager">
+                    <div class="view-header-bar">
+                        <h3>Enterprise IP Pool & Delegation Manager</h3>
+                    </div>
+
+                    <div class="split-layout-db" style="display:flex; gap:20px;">
+                        <div class="split-card glass" style="flex:2;">
+                            <h4>Active IPv4 Pool</h4>
+                            <table class="neocp-data-table" id="ip-pool-table">
+                                <thead>
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Subnet</th>
+                                        <th>Type</th>
+                                        <th>Owner / Delegate</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="split-card glass" style="flex:1;">
+                            <h4>Add New IPv4 to Pool</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>IPv4 Address</label>
+                                    <input type="text" id="new-ip-addr" placeholder="e.g. 192.168.1.105">
+                                </div>
+                                <div class="input-group">
+                                    <label>Netmask</label>
+                                    <input type="text" id="new-ip-mask" value="255.255.255.0">
+                                </div>
+                                <div class="toggle-group-inline">
+                                    <input type="checkbox" id="new-ip-shared">
+                                    <label for="new-ip-shared">Mark as Global Shared IP</label>
+                                </div>
+                                <button class="action-btn" id="add-ip-pool-btn">Bind IP to Interface</button>
+                            </div>
+
+                            <h4 style="margin-top: 30px;">Delegate IP to Reseller</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>Target IP</label>
+                                    <select id="delegate-ip-select" class="role-selector">
+                                        <!-- Injected via JS -->
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Assign to Reseller</label>
+                                    <select id="delegate-reseller-select" class="role-selector">
+                                        <!-- Injected via JS -->
+                                    </select>
+                                </div>
+                                <button class="action-btn" id="delegate-ip-btn">Finalize Delegation</button>
                             </div>
                         </div>
                     </div>

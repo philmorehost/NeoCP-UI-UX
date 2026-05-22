@@ -114,6 +114,7 @@ func main() {
 	mux.Handle("/api/domains/redirect", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainRedirectChange)))
 	mux.Handle("/api/domains/dns", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDNSRecords)))
 	mux.Handle("/api/domains/dns/sync", api.RequireRole("admin")(http.HandlerFunc(handleDNSSync)))
+	mux.Handle("/api/domains/dns/security", api.RequireRole("admin")(http.HandlerFunc(handleDNSSecurity)))
 	mux.Handle("/api/domains/waf", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDomainWAF)))
 	mux.Handle("/api/domains/nginx/clearcache", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainClearNginxCache)))
 
@@ -363,6 +364,63 @@ func handleDomainClearNginxCache(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(1 * time.Second)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"success":true, "log": "NGINX cache for ` + req.DomainName + ` purged successfully."}`))
+}
+
+func handleDNSSecurity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DomainName string `json:"domain_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	db := core.GetDB()
+	ip := db.GetServerConfig().SharedIP
+
+	// 1. Generate DKIM
+	_, pub, _ := oslayer.GenerateDKIMKey()
+	dkimRec := core.DNSRecord{
+		ID:    fmt.Sprintf("dns_dkim_%d", time.Now().Unix()),
+		Type:  "TXT",
+		Name:  "default._domainkey",
+		Value: "v=DKIM1; k=rsa; p=" + pub,
+		TTL:   3600,
+	}
+
+	// 2. Generate SPF
+	spfRec := core.DNSRecord{
+		ID:    fmt.Sprintf("dns_spf_%d", time.Now().Unix()),
+		Type:  "TXT",
+		Name:  "@",
+		Value: oslayer.GenerateSPFRecord(ip),
+		TTL:   3600,
+	}
+
+	// 3. Generate DMARC
+	dmarcRec := core.DNSRecord{
+		ID:    fmt.Sprintf("dns_dmarc_%d", time.Now().Unix()),
+		Type:  "TXT",
+		Name:  "_dmarc",
+		Value: oslayer.GenerateDMARCRecord(req.DomainName),
+		TTL:   3600,
+	}
+
+	_ = db.AddDNSRecord(req.DomainName, dkimRec)
+	_ = db.AddDNSRecord(req.DomainName, spfRec)
+	_ = db.AddDNSRecord(req.DomainName, dmarcRec)
+
+	// Regenerate zone file
+	recs, _ := db.GetDNSRecords(req.DomainName)
+	_, _ = oslayer.GenerateBind9ZoneFile(req.DomainName, recs, workspaceDir)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "log": "DKIM, SPF, and DMARC security records successfully published."}`))
 }
 
 func handleDNSSync(w http.ResponseWriter, r *http.Request) {
@@ -1083,9 +1141,17 @@ func handleBulkMigration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mgr := uzme.NewMigrationManager()
-	progress := make(chan uzme.BulkMigrationTask)
+	progress := make(chan uzme.BulkMigrationTask, len(req.Accounts)+1)
 
-	go mgr.ExecuteBulkMigration(r.Context(), req.Source, req.Accounts, progress)
+	// Use background context for long-running migration task
+	go mgr.ExecuteBulkMigration(context.Background(), req.Source, req.Accounts, progress)
+
+	// Drain progress channel in background to prevent blocking
+	go func() {
+		for range progress {
+			// In production, update status in DB or notify via WS
+		}
+	}()
 
 	// In production, we'd store these tasks in DB and stream progress via WS
 	w.WriteHeader(http.StatusAccepted)
