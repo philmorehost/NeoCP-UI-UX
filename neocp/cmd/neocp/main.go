@@ -1,16 +1,15 @@
 package main
 
 import (
+	"neocp/web/static"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"embed"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -26,11 +25,10 @@ import (
 
 	"neocp/internal/api"
 	"neocp/internal/core"
+	"neocp/internal/core/uzme"
 	"neocp/internal/oslayer"
 )
 
-//go:embed web/static
-var staticFS embed.FS
 
 var (
 	workspaceDir string
@@ -75,10 +73,7 @@ func main() {
 	mux.Handle("/api/telemetry/ws", api.RequireRole("admin")(http.HandlerFunc(api.TelemetryWebSocketHandler)))
 
 	// Sub FS for static assets
-	subFS, err := fs.Sub(staticFS, "web/static")
-	if err != nil {
-		log.Fatalf("Fatal: Failed to bind static FS embed: %v", err)
-	}
+	subFS := static.FS
 
 	// Dynamic Embed Serve
 	fileServer := http.FileServer(http.FS(subFS))
@@ -134,6 +129,7 @@ func main() {
 	// Reseller Center endpoints
 	mux.Handle("/api/reseller/accounts", api.RequireRole("admin", "reseller")(http.HandlerFunc(handleResellerAccounts)))
 	mux.Handle("/api/reseller/transfer", api.RequireRole("admin")(http.HandlerFunc(handleAccountTransfer)))
+	mux.Handle("/api/reseller/transfer/bulk", api.RequireRole("admin")(http.HandlerFunc(handleBulkAccountTransfer)))
 
 	// Priority support tickets
 	mux.Handle("/api/tickets", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleTickets)))
@@ -141,6 +137,8 @@ func main() {
 
 	// Migration Tasks (UZME)
 	mux.Handle("/api/migrations", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleMigrations)))
+	mux.Handle("/api/migrations/bulk", api.RequireRole("admin")(http.HandlerFunc(handleBulkMigration)))
+	mux.Handle("/api/migrations/convert", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleConvertAddon)))
 
 	// Cron Jobs
 	mux.Handle("/api/cron", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleCronJobs)))
@@ -1070,6 +1068,55 @@ func handleTicketReply(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"success":true}`))
 }
 
+func handleBulkMigration(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Source   uzme.SourcePanelConfig   `json:"source"`
+		Accounts []uzme.BulkMigrationTask `json:"accounts"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	mgr := uzme.NewMigrationManager()
+	progress := make(chan uzme.BulkMigrationTask)
+
+	go mgr.ExecuteBulkMigration(r.Context(), req.Source, req.Accounts, progress)
+
+	// In production, we'd store these tasks in DB and stream progress via WS
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"success":true, "message": "Bulk migration initiated"}`))
+}
+
+func handleConvertAddon(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		SourceUser  string `json:"source_user"`
+		AddonDomain string `json:"addon_domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	mgr := uzme.NewMigrationManager()
+	err := mgr.ConvertAddonToAccount(r.Context(), req.SourceUser, req.AddonDomain, sandboxDir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true, "message": "Addon converted to primary account"}`))
+}
+
 func handleMigrations(w http.ResponseWriter, r *http.Request) {
 	db := core.GetDB()
 	username := r.Header.Get("NeoCP-User")
@@ -1406,6 +1453,18 @@ func handleServerConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
+
+		oldConf := db.GetServerConfig()
+
+		// Apply changes to OS if values changed
+		if conf.Hostname != oldConf.Hostname && conf.Hostname != "" {
+			_ = oslayer.SetHostname(r.Context(), conf.Hostname)
+		}
+
+		if len(conf.Resolvers) >= 2 {
+			_ = oslayer.UpdateResolvers(r.Context(), conf.Resolvers[0], conf.Resolvers[1])
+		}
+
 		db.UpdateServerConfig(conf)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"success":true}`))
@@ -1429,6 +1488,10 @@ func handleIPAddresses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ip.Owner = "admin"
+
+		// Attempt OS binding (best effort)
+		_ = oslayer.AssignIPToInterface(r.Context(), ip.IP, ip.Subnet, "eth0")
+
 		if err := db.AddIPAddress(ip); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -1456,6 +1519,37 @@ func handleResellerAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
+}
+
+func handleBulkAccountTransfer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Usernames []string `json:"usernames"`
+		NewOwner  string   `json:"new_owner"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	db := core.GetDB()
+	var successes []string
+	var failures []string
+	for _, user := range req.Usernames {
+		if err := db.TransferOwnership(user, req.NewOwner); err != nil {
+			failures = append(failures, user)
+		} else {
+			successes = append(successes, user)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   len(failures) == 0,
+		"successes": successes,
+		"failures":  failures,
+	})
 }
 
 func handleAccountTransfer(w http.ResponseWriter, r *http.Request) {

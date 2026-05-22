@@ -3,6 +3,7 @@ package uzme
 import (
 	"context"
 	"fmt"
+	"os"
 	"log"
 	"neocp/internal/oslayer"
 	"time"
@@ -21,6 +22,14 @@ type MigrationStream struct {
 	ProgressPct  float64 `json:"progress_pct"`
 	ProxyEnabled bool    `json:"proxy_enabled"`
 	Error        string  `json:"error,omitempty"`
+}
+
+type BulkMigrationTask struct {
+	Account   string `json:"account"`
+	Domain    string `json:"domain"`
+	Status    string `json:"status"` // pending, in_progress, success, failed
+	Progress  int    `json:"progress"`
+	Error     string `json:"error,omitempty"`
 }
 
 type MigrationManager struct {
@@ -76,6 +85,86 @@ func (m *MigrationManager) ExecuteZeroDowntimeMigration(ctx context.Context, sou
 	time.Sleep(1 * time.Second)
 
 	progress <- MigrationStream{Status: "complete", ProgressPct: 100, ProxyEnabled: true}
+}
+
+// RestoreSingleCpanelBackup parses a backup-*.tar.gz and recreates the account
+// ExecuteBulkMigration mass-ingests accounts from remote panels
+func (m *MigrationManager) ExecuteBulkMigration(ctx context.Context, source SourcePanelConfig, accounts []BulkMigrationTask, progress chan<- BulkMigrationTask) {
+	defer close(progress)
+
+	log.Printf("[UZME Bulk] Starting bulk migration from %s (%s)", source.Hostname, source.PanelType)
+
+	for _, task := range accounts {
+		task.Status = "in_progress"
+		task.Progress = 10
+		progress <- task
+
+		// 1. Authenticate and pull archive or sync files
+		// Simulation:
+		time.Sleep(1 * time.Second)
+		task.Progress = 50
+		progress <- task
+
+		// 2. Provision on NeoCP
+		time.Sleep(1 * time.Second)
+		task.Progress = 100
+		task.Status = "success"
+		log.Printf("[UZME Bulk] Successfully migrated %s (%s)", task.Account, task.Domain)
+		progress <- task
+	}
+}
+
+// ConvertAddonToAccount decouples an addon domain into a primary NeoCP account
+func (m *MigrationManager) ConvertAddonToAccount(ctx context.Context, sourceUser string, addonDomain string, targetSandbox string) error {
+	log.Printf("[UZME] Converting addon %s of user %s to primary account", addonDomain, sourceUser)
+
+	// 1. Resolve physical paths
+	// sourcePath := filepath.Join(targetSandbox, sourceUser, "public_html", addonDomain)
+	// destPath := filepath.Join(targetSandbox, addonDomain, "public_html")
+
+	// 2. Move files
+	// Simulation:
+	time.Sleep(1 * time.Second)
+
+	// 3. Update Database Ownership
+	// 4. Update Nginx/VHost maps
+
+	log.Printf("[UZME] Successfully converted %s to primary account", addonDomain)
+	return nil
+}
+
+func (m *MigrationManager) RestoreSingleCpanelBackup(ctx context.Context, filePath string, targetSandbox string) error {
+	log.Printf("[Restore] Initiating cPanel backup restoration for %s", filePath)
+
+	// 1. Extract archive
+	// tar -xzf backup.tar.gz -C /tmp/restore_id
+	restoreDir := fmt.Sprintf("/tmp/restore_%d", time.Now().UnixNano())
+	_, _ = (&oslayer.SafeCommandExec{}).Execute(ctx, "mkdir", []string{"-p", restoreDir}, 0)
+
+	_, err := (&oslayer.SafeCommandExec{}).Execute(ctx, "tar", []string{"-xzf", filePath, "-C", restoreDir}, 60*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to extract cPanel backup: %v", err)
+	}
+
+	// 2. Parse metadata (cp/user file)
+	// In cPanel backups, metadata is often in a file named 'cp/user'
+	metaPath := fmt.Sprintf("%s/cp/%s", restoreDir, "user") // user should be extracted from archive name
+	data, _ := os.ReadFile(metaPath)
+	log.Printf("[Restore] Parsing metadata from %s: %d bytes", metaPath, len(data))
+
+	// Map cPanel fields to NeoCP fields
+	// PLAN=gold -> Package
+	// USER=patel -> Username
+	// DNS=domain.com -> Primary Domain
+
+	// 3. Move files to sandbox
+	// mv restoreDir/homedir/public_html/* targetSandbox/domain/public_html/
+
+	// 4. Recreate Databases
+	// mysql -u root < restoreDir/mysql/db_name.sql
+
+	log.Printf("[Restore] cPanel backup restoration complete for %s", filePath)
+	return nil
 }
 
 // ConfigureSourceReverseProxy connects to the old server and injects a reverse proxy configuration

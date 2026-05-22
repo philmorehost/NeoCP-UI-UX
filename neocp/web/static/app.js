@@ -597,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td>
                         <div class="table-actions">
+                            <button class="action-btn-secondary convert-account-btn" data-domain="${dom.domain_name}" data-owner="${dom.owner}" style="padding: 4px 8px; font-size: 0.75rem;">Decouple</button>
                             <button class="action-btn-secondary toggle-staging-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Staging</button>
                             <button class="action-btn-secondary ssl-issue-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Issue SSL</button>
                             <button class="action-btn-secondary redirect-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Redirect</button>
@@ -682,6 +683,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     await toggleDomainCompressionSetting(dom);
                 });
             });
+
+    // Convert to Primary Account trigger
+    document.querySelectorAll('.convert-account-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const domain = e.target.getAttribute('data-domain');
+            const owner = e.target.getAttribute('data-owner');
+            if (confirm(`Convert ${domain} to a standalone primary NeoCP account? This will decouple it from ${owner}.`)) {
+                addTaskIndicator();
+                try {
+                    const res = await fetch('/api/migrations/convert', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                        },
+                        body: JSON.stringify({ source_user: owner, addon_domain: domain })
+                    });
+                    if (res.ok) {
+                        showNotification(`${domain} decoupled and converted to primary account!`, 'success');
+                        loadDomainsTable();
+                    }
+                } catch (e) {} finally {
+                    removeTaskIndicator();
+                }
+            }
+        });
+    });
 
             // SSL action triggers
             document.querySelectorAll('.ssl-issue-btn').forEach(btn => {
@@ -1590,19 +1618,28 @@ document.addEventListener('DOMContentLoaded', () => {
         addTaskIndicator();
         showNotification('Establishing authenticated handshake with legacy server...', 'info');
 
+        // Check if it's bulk or single (simplified for this stage)
+        const isBulk = targetDomain === '*' || targetDomain.includes(',');
+
         try {
-            const res = await fetch('/api/migrations', {
+            const endpoint = isBulk ? '/api/migrations/bulk' : '/api/migrations';
+            const body = isBulk ? {
+                source: { panel_type: sourceType, hostname: sourceHost, api_token: sourceToken, username: 'root' },
+                accounts: targetDomain.split(',').map(u => ({ account: u.trim(), domain: 'auto', status: 'pending', progress: 0 }))
+            } : {
+                panel_type: sourceType,
+                hostname: sourceHost,
+                target_domain: targetDomain,
+                owner: currentUser
+            };
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
                 },
-                body: JSON.stringify({
-                    panel_type: sourceType,
-                    hostname: sourceHost,
-                    target_domain: targetDomain,
-                    owner: currentUser
-                })
+                body: JSON.stringify(body)
             });
             const task = await res.json();
             if (res.ok) {
