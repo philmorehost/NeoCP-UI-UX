@@ -10,9 +10,9 @@
       "disk_limit": 0,
       "bandwidth_used": 45,
       "bandwidth_limit": 0,
-      "domains_used": 1,
+      "domains_used": 3,
       "domains_limit": 0,
-      "created_at": "2026-05-20T18:00:00Z"
+      "created_at": "2026-05-21T23:33:52.869460654Z"
     },
     "patel": {
       "username": "patel",
@@ -26,7 +26,7 @@
       "bandwidth_limit": 100,
       "domains_used": 2,
       "domains_limit": 10,
-      "created_at": "2026-05-20T18:00:00Z"
+      "created_at": "2026-05-21T23:33:52.86946225Z"
     },
     "reseller1": {
       "username": "reseller1",
@@ -40,12 +40,12 @@
       "bandwidth_limit": 2000,
       "domains_used": 1,
       "domains_limit": 50,
-      "created_at": "2026-05-20T18:00:00Z"
+      "created_at": "2026-05-21T23:33:52.869461857Z"
     }
   },
   "domains": {
-    "blog-stage.digitalneo.net": {
-      "domain_name": "blog-stage.digitalneo.net",
+    "blog.digitalneo.net": {
+      "domain_name": "blog.digitalneo.net",
       "owner": "patel",
       "php_version": "8.2",
       "directory_privacy": false,
@@ -53,8 +53,8 @@
       "directory_privacy_pass": "",
       "redirect_url": "",
       "ssl_active": true,
-      "ssl_issuer": "NeoCP Staging Authority",
-      "ssl_expires": "2026-08-20T18:47:45.701285049Z",
+      "ssl_issuer": "Let's Encrypt Authority X3",
+      "ssl_expires": "2026-08-05T23:33:52.869462476Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -67,50 +67,42 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-20T18:47:45.701286302Z"
+      "created_at": "2026-04-21T23:33:52.869508989Z"
     },
-    "blog.digitalneo.net": {
-      "domain_name": "blog.digitalneo.net",
+    "shop.digitalneo.net": {
+      "domain_name": "shop.digitalneo.net",
       "owner": "patel",
-      "php_version": "8.2",
+      "php_version": "8.3",
       "directory_privacy": false,
       "directory_privacy_user": "",
       "directory_privacy_pass": "",
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-04T18:00:00Z",
-      "webdav_enabled": false,
+      "ssl_expires": "2026-07-19T23:33:52.869509736Z",
+      "webdav_enabled": true,
       "hotlink_protected": false,
       "leech_protected": false,
       "gzip_enabled": true,
       "brotli_enabled": false,
-      "dns_records": [],
+      "dns_records": null,
       "waf_policy": {
-        "sqli_shield": true,
-        "xss_block": true,
-        "lfi_shield": true,
-        "csrf_header": true
+        "sqli_shield": false,
+        "xss_block": false,
+        "lfi_shield": false,
+        "csrf_header": false
       },
-      "created_at": "2026-04-20T18:00:00Z"
+      "created_at": "2026-05-11T23:33:52.869509867Z"
     }
   },
   "databases": {
-    "patel_staging_wpblog": {
-      "name": "patel_staging_wpblog",
-      "owner": "patel",
-      "db_user": "patel_wpuser_stage",
-      "password": "dbpassword123",
-      "remote_ips": "%",
-      "created_at": "2026-05-20T18:47:45.700570879Z"
-    },
     "patel_wpblog": {
       "name": "patel_wpblog",
       "owner": "patel",
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-20T18:00:00Z"
+      "created_at": "2026-05-21T23:33:52.86951111Z"
     }
   },
   "cron_jobs": {
@@ -121,19 +113,29 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-20T18:47:45.180222072Z"
+      "created_at": "2026-05-21T23:33:52.86951149Z"
     }
   },
   "reseller_packages": {
-    "Standard Hosting Plan": {
-      "name": "Standard Hosting Plan",
-      "disk_limit": 5000,
-      "bandwidth_limit": 100,
-      "domains_limit": 2,
-      "databases_limit": 1,
+    "Enterprise-Cluster": {
+      "name": "Enterprise-Cluster",
+      "disk_limit": 50000,
+      "bandwidth_limit": 1000,
+      "domains_limit": 100,
+      "databases_limit": 250,
+      "lve_cpu_pct": 100,
+      "lve_ram_mb": 2048,
+      "created_at": "2026-05-21T23:33:52.869510929Z"
+    },
+    "Premium-Personal": {
+      "name": "Premium-Personal",
+      "disk_limit": 2000,
+      "bandwidth_limit": 50,
+      "domains_limit": 3,
+      "databases_limit": 5,
       "lve_cpu_pct": 50,
       "lve_ram_mb": 512,
-      "created_at": "2026-05-20T18:00:00Z"
+      "created_at": "2026-05-21T23:33:52.869510356Z"
     }
   },
   "tickets": {
@@ -147,38 +149,19 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-20T16:47:45.180222615Z"
+          "timestamp": "2026-05-21T21:33:52.869518344Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-20T17:47:45.180223004Z"
+          "timestamp": "2026-05-21T22:33:52.869518494Z"
         }
       ],
-      "created_at": "2026-05-20T16:47:45.180223106Z"
+      "created_at": "2026-05-21T21:33:52.86951861Z"
     }
   },
   "docker_containers": {},
   "migration_tasks": {},
   "firewall_blocks": {},
-  "cluster_nodes": {
-    "test-worker-01": {
-      "node_id": "test-worker-01",
-      "ip": "127.0.0.1",
-      "role": "web",
-      "is_active": false,
-      "cpu_load": 12.5,
-      "ram_load": 45.2,
-      "last_ping": "2026-05-20T18:47:45.192500305Z"
-    },
-    "vps-443": {
-      "node_id": "vps-443",
-      "ip": "1.2.3.4",
-      "role": "db",
-      "is_active": false,
-      "cpu_load": 0,
-      "ram_load": 0,
-      "last_ping": "2026-05-20T19:11:49.341550898Z"
-    }
-  }
+  "cluster_nodes": {}
 }
