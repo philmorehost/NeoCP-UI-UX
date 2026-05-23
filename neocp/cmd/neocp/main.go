@@ -151,6 +151,10 @@ func main() {
 	// Cron Jobs
 	mux.Handle("/api/cron", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleCronJobs)))
 
+	// Email & FTP
+	mux.Handle("/api/mail/accounts", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleMailAccounts)))
+	mux.Handle("/api/ftp/accounts", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFTPAccounts)))
+
 	// System Process Manager
 	mux.Handle("/api/processes", api.RequireRole("admin")(http.HandlerFunc(handleProcessesList)))
 	mux.Handle("/api/processes/kill", api.RequireRole("admin")(http.HandlerFunc(handleProcessKill)))
@@ -1081,6 +1085,57 @@ func handleTickets(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(ticket)
+		return
+	}
+}
+
+func handleMailAccounts(w http.ResponseWriter, r *http.Request) {
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	role := r.Header.Get("NeoCP-Role")
+	isAdmin := (role == "admin")
+
+	if r.Method == http.MethodGet {
+		mails := db.GetMailAccounts(username, isAdmin)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(mails)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var m core.MailAccount
+		if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		m.Owner = username
+		m.CreatedAt = time.Now()
+		if err := db.CreateMailAccount(m); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(m)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		email := r.URL.Query().Get("email")
+		if err := db.DeleteMailAccount(email); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success":true}`))
+		return
+	}
+}
+
+func handleFTPAccounts(w http.ResponseWriter, r *http.Request) {
+	// Simulation for FTP accounts (similar to Mail)
+	if r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[]`))
 		return
 	}
 }

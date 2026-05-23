@@ -159,6 +159,7 @@
       "created_at": "2026-05-22T17:22:55.257120624Z"
     }
   },
+  "mail_accounts": {},
   "cron_jobs": {
     "cron_1": {
       "id": "cron_1",

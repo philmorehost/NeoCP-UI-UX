@@ -83,6 +83,9 @@
                     <li class="menu-item" data-target="databases">
                         <span class="item-icon">🗄️</span> Databases Core
                     </li>
+                    <li class="menu-item" data-target="mail">
+                        <span class="item-icon">📧</span> Email & FTP
+                    </li>
                     <li class="menu-item" data-target="backups">
                         <span class="item-icon">💾</span> Backup Manager
                     </li>
@@ -559,6 +562,51 @@
                     </div>
                 </div>
 
+                <!-- VIEW: MAIL & FTP -->
+                <div class="viewport-view" id="view-mail">
+                    <div class="view-header-bar">
+                        <h3>Mail & FTP Administration Suite</h3>
+                    </div>
+
+                    <div class="split-layout-db" style="display:flex; gap:20px;">
+                        <div class="split-card glass" style="flex:2;">
+                            <h4>Active Email Accounts</h4>
+                            <table class="neocp-data-table" id="mail-accounts-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email Address</th>
+                                        <th>Usage / Quota</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="split-card glass" style="flex:1;">
+                            <h4>Create New Email Account</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>Email Address</label>
+                                    <input type="text" id="new-mail-addr" placeholder="e.g. hello@domain.com">
+                                </div>
+                                <div class="input-group">
+                                    <label>Password</label>
+                                    <input type="password" id="new-mail-pass" placeholder="Email secret...">
+                                </div>
+                                <div class="input-group">
+                                    <label>Quota (MB)</label>
+                                    <input type="number" id="new-mail-quota" value="500">
+                                </div>
+                                <button class="action-btn" id="add-mail-btn">Provision Mail Account</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- VIEW 5: SECURITY CENTER -->
                 <div class="viewport-view" id="view-security">
                     <div class="view-header-bar">
@@ -821,7 +869,7 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                         <h5 style="margin:0; color:#3b82f6;">Backuply Pro Active</h5>
                                         <p style="font-size:12px; margin:5px 0;">Automated backups to AWS S3, Google Drive, and FTP nodes.</p>
                                     </div>
-                                    <button class="action-btn" style="padding: 8px 15px; font-size:12px;">Configure Backuply</button>
+                                    <button class="action-btn" id="open-backuply-modal" style="padding: 8px 15px; font-size:12px;">Configure Backuply</button>
                                 </div>
                             </div>
                         </div>
@@ -1540,6 +1588,50 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
         </div>
     </div>
 
+    <!-- Backuply Modal -->
+    <div class="neocp-modal-backdrop" id="backuply-modal">
+        <div class="neocp-modal-card glass" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cloud-upload-alt"></i> Backuply Pro — Cloud Connectors</h3>
+                <button class="modal-close-btn" id="close-backuply-modal-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Enable Automated Cloud Sync</label>
+                    <select id="backuply-enabled">
+                        <option value="false">Disabled</option>
+                        <option value="true">Active (Pro)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>AWS S3 Bucket Name</label>
+                    <input type="text" id="backuply-s3-bucket" placeholder="e.g. neocp-backups-production">
+                </div>
+                <div class="form-group" style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label>S3 Key ID</label>
+                        <input type="text" id="backuply-s3-key">
+                    </div>
+                    <div style="flex:1;">
+                        <label>S3 Secret</label>
+                        <input type="password" id="backuply-s3-secret">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Google Drive Integration</label>
+                    <select id="backuply-gdrive">
+                        <option value="false">Disconnected</option>
+                        <option value="true">Linked to NeoCP Workspace</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Remote FTP Node (Offsite)</label>
+                    <input type="text" id="backuply-ftp-host" placeholder="ftp.backup-server.com">
+                </div>
+                <button class="action-btn" id="save-backuply-btn" style="margin-top: 15px; width: 100%;">Save Connector Configuration</button>
+            </div>
+        </div>
+    </div>
     <script src="/static/app.js"></script>
 </body>
 </html>

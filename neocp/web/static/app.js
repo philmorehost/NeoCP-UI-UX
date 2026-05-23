@@ -177,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (targetViewId === 'domains') loadDomainsTable();
         if (targetViewId === 'databases') loadDatabasesTable();
+        if (targetViewId === 'mail') loadMailAccounts();
         if (targetViewId === 'reseller') {
             loadPackagesTable();
             loadResellerAccounts();
@@ -2328,6 +2329,68 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    async function loadMailAccounts() {
+        const tbody = document.querySelector('#mail-accounts-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading maildir nodes...</td></tr>';
+        try {
+            const res = await fetch('/api/mail/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const mails = await res.json();
+            tbody.innerHTML = '';
+            if (mails.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-muted">No email accounts found.</td></tr>';
+                return;
+            }
+            mails.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${m.email}</strong></td>
+                    <td>${m.used_mb} MB / ${m.quota_mb} MB</td>
+                    <td><span class="status-badge badge-green">Active</span></td>
+                    <td>
+                        <button class="action-btn-secondary delete-mail-btn text-red" data-email="${m.email}" style="padding:2px 6px; font-size:0.75rem; border-color:rgba(239,68,68,0.2);">Delete</button>
+                    </td>
+                `;
+                tr.querySelector('.delete-mail-btn').addEventListener('click', async () => {
+                    if (confirm(`Delete mail account ${m.email}?`)) {
+                        await fetch(`/api/mail/accounts?email=${m.email}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                        });
+                        loadMailAccounts();
+                    }
+                });
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    document.getElementById('add-mail-btn')?.addEventListener('click', async () => {
+        const email = document.getElementById('new-mail-addr').value;
+        const password = document.getElementById('new-mail-pass').value;
+        const quota = parseInt(document.getElementById('new-mail-quota').value);
+        if (!email || !password) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/mail/accounts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ email, password, quota_mb: quota, domain: email.split('@')[1] })
+            });
+            if (res.ok) {
+                showNotification(`Mail account ${email} provisioned.`, 'success');
+                loadMailAccounts();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
+
     async function loadResellerAccounts() {
         const tbody = document.querySelector('#reseller-accounts-table tbody');
         if (!tbody) return;
@@ -3669,4 +3732,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     boot();
+});
+
+// --- Backuply Pro Event Listeners ---
+document.addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'open-backuply-modal') {
+        document.getElementById('backuply-modal').style.display = 'flex';
+        // Fetch current config
+        const res = await fetch('/api/backuply/config', {
+            headers: { 'NeoCP-User': currentUser, 'NeoCP-Role': currentRole }
+        });
+        const conf = await res.json();
+        if (conf) {
+            document.getElementById('backuply-enabled').value = conf.enabled ? "true" : "false";
+            document.getElementById('backuply-s3-bucket').value = conf.s3_bucket || "";
+            document.getElementById('backuply-s3-key').value = conf.s3_key || "";
+            document.getElementById('backuply-s3-secret').value = conf.s3_secret || "";
+            document.getElementById('backuply-gdrive').value = conf.gdrive_enabled ? "true" : "false";
+            document.getElementById('backuply-ftp-host').value = conf.ftp_host || "";
+        }
+    }
+
+    if (e.target && e.target.id === 'close-backuply-modal-btn') {
+        document.getElementById('backuply-modal').style.display = 'none';
+    }
+
+    if (e.target && e.target.id === 'save-backuply-btn') {
+        const payload = {
+            enabled: document.getElementById('backuply-enabled').value === "true",
+            s3_bucket: document.getElementById('backuply-s3-bucket').value,
+            s3_key: document.getElementById('backuply-s3-key').value,
+            s3_secret: document.getElementById('backuply-s3-secret').value,
+            gdrive_enabled: document.getElementById('backuply-gdrive').value === "true",
+            ftp_host: document.getElementById('backuply-ftp-host').value
+        };
+
+        const res = await fetch('/api/backuply/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'NeoCP-User': currentUser,
+                'NeoCP-Role': currentRole
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            showNotification('Backuply cloud connectors updated successfully.', 'success');
+            document.getElementById('backuply-modal').style.display = 'none';
+        } else {
+            showNotification('Failed to update Backuply configuration.', 'error');
+        }
+    }
 });

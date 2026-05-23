@@ -96,6 +96,16 @@ type Database struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type MailAccount struct {
+	Email     string    `json:"email"`
+	Owner     string    `json:"owner"`
+	Domain    string    `json:"domain"`
+	Password  string    `json:"password"`
+	QuotaMB   int64     `json:"quota_mb"`
+	UsedMB    int64     `json:"used_mb"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type CronJob struct {
 	ID        string    `json:"id"`
 	Owner     string    `json:"owner"`
@@ -212,6 +222,7 @@ type DatabaseStore struct {
 	Accounts         map[string]Account         `json:"accounts"`
 	Domains          map[string]Domain          `json:"domains"`
 	Databases        map[string]Database        `json:"databases"`
+	MailAccounts     map[string]MailAccount     `json:"mail_accounts"`
 	CronJobs         map[string]CronJob         `json:"cron_jobs"`
 	ResellerPackages map[string]ResellerPackage `json:"reseller_packages"`
 	Tickets          map[string]Ticket          `json:"tickets"`
@@ -252,6 +263,7 @@ func GetDB() *DatabaseEngine {
 				FirewallBlocks:   make(map[string]FirewallBlock),
 				ClusterNodes:     make(map[string]ClusterNode),
 				SSHKeys:          make(map[string]SSHKey),
+				MailAccounts:     make(map[string]MailAccount),
 			},
 		}
 		engineInstance.load()
@@ -303,6 +315,9 @@ func (db *DatabaseEngine) load() {
 		}
 		if loaded.SSHKeys != nil {
 			db.store.SSHKeys = loaded.SSHKeys
+		}
+		if loaded.MailAccounts != nil {
+			db.store.MailAccounts = loaded.MailAccounts
 		}
 	}
 }
@@ -1371,6 +1386,37 @@ func (db *DatabaseEngine) UpdateDomainGit(domainName string, git GitConfig) erro
 	}
 	dom.GitOps = git
 	db.store.Domains[domainName] = dom
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetMailAccounts(owner string, isAdmin bool) []MailAccount {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	var res []MailAccount
+	for _, m := range db.store.MailAccounts {
+		if isAdmin || m.Owner == owner {
+			res = append(res, m)
+		}
+	}
+	return res
+}
+
+func (db *DatabaseEngine) CreateMailAccount(m MailAccount) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if _, exists := db.store.MailAccounts[m.Email]; exists {
+		return errors.New("email account already exists")
+	}
+	db.store.MailAccounts[m.Email] = m
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) DeleteMailAccount(email string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	delete(db.store.MailAccounts, email)
 	db.save()
 	return nil
 }
