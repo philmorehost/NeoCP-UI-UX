@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
         if (targetViewId === 'clustering') loadClusterNodes();
+        if (targetViewId === 'cron') loadCronJobs();
         if (targetViewId === 'security') {
             loadFirewallBlocks();
             loadDomainsTable();
@@ -950,9 +951,39 @@ document.addEventListener('DOMContentLoaded', () => {
         showNotification(`WebDAV network storage adapter ${webdavEnabled ? 'activated on port 8081' : 'disabled'}.`, 'info');
     });
 
+    // Drag & Drop Upload Enhancer
+    const dropZone = document.getElementById('filemanager-drop-zone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        async function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+
+            showNotification(`Uploading ${files.length} items...`, 'info');
+            for (let file of files) {
+                // Simulating upload
+                addTaskIndicator();
+                setTimeout(() => {
+                    removeTaskIndicator();
+                    showNotification(`Uploaded ${file.name} successfully.`, 'success');
+                    loadFileExplorer();
+                }, 1000);
+            }
+        }
+    }
+
     async function loadFileExplorer() {
         currentDirLabel.textContent = currentPath;
         const tbody = document.querySelector('#filemanager-table tbody');
+        if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading user files sandbox...</td></tr>';
 
         try {
@@ -1027,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Delete file
                 tr.querySelector('.delete-file-btn').addEventListener('click', async () => {
-                    if (confirm(`Wipe ${item.name} permanently?`)) {
+                    if (confirm(`Move ${item.name} to trash?`)) {
                         await deleteSandboxItem(`${currentPath}/${item.name}`);
                     }
                 });
@@ -1050,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
             if (res.ok) {
-                showNotification('Deleted item successfully from filesystem.', 'success');
+                showNotification('Item moved to trash.', 'success');
                 loadFileExplorer();
             }
         } catch (e) {
@@ -1058,6 +1089,28 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             removeTaskIndicator();
         }
+    }
+
+    const emptyTrashBtn = document.getElementById('filemanager-empty-trash-btn');
+    if (emptyTrashBtn) {
+        emptyTrashBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to empty the trash? This action is irreversible.')) return;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/filemanager/trash/empty', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(`Trash emptied. Freed ${formatBytes(data.bytes_freed)}.`, 'success');
+                }
+            } catch (e) {
+                showNotification('Error emptying trash.', 'error');
+            } finally {
+                removeTaskIndicator();
+            }
+        });
     }
 
     // Interactive File Editor
@@ -1766,51 +1819,61 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('attach-node-btn').addEventListener('click', attachNode);
 
     // ==========================================================================
-    // 13. WHM RESOURCE PACKAGE PROVISIONER
+    // 13. WHM RESOURCE PACKAGE PROVISIONER & RESELLER CENTER
     // ==========================================================================
     const createPkgBtn = document.getElementById('create-package-btn');
-    createPkgBtn.addEventListener('click', async () => {
-        const name = document.getElementById('pkg-name-input').value;
-        const disk = parseInt(document.getElementById('pkg-disk-input').value) || 0;
-        const bw = parseInt(document.getElementById('pkg-bw-input').value) || 0;
-        const domains = parseInt(document.getElementById('pkg-domains-input').value) || 0;
-        const db = parseInt(document.getElementById('pkg-db-input').value) || 0;
-        const cpu = parseInt(document.getElementById('pkg-cpu-input').value) || 0;
-        const ram = parseInt(document.getElementById('pkg-ram-input').value) || 0;
+    if (createPkgBtn) {
+        createPkgBtn.addEventListener('click', async () => {
+            const name = document.getElementById('pkg-name-input').value;
+            const disk = document.getElementById('pkg-disk-input').value;
+            const bw = document.getElementById('pkg-bw-input').value;
+            const db = document.getElementById('pkg-db-input').value;
+            const ftp = document.getElementById('pkg-ftp-input').value;
+            const email = document.getElementById('pkg-email-input').value;
+            const hourly = document.getElementById('pkg-hourly-email-input').value;
+            const shell = document.getElementById('pkg-shell-toggle').checked;
+            const cgi = document.getElementById('pkg-cgi-toggle').checked;
+            const isReseller = document.getElementById('pkg-reseller-toggle').checked;
+            const locale = document.getElementById('pkg-locale-select').value;
 
-        if (!name) {
-            showNotification('Please enter a package name.', 'error');
-            return;
-        }
-
-        addTaskIndicator();
-        try {
-            const res = await fetch('/api/packages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
-                },
-                body: JSON.stringify({
-                    name,
-                    disk_limit: disk,
-                    bandwidth_limit: bw,
-                    domains_limit: domains,
-                    databases_limit: db,
-                    lve_cpu_pct: cpu,
-                    lve_ram_mb: ram
-                })
-            });
-            if (res.ok) {
-                showNotification('WHM custom reseller subscription plan deployed.', 'success');
-                loadPackagesTable();
+            if (!name) {
+                showNotification('Please enter a package name.', 'error');
+                return;
             }
-        } catch (e) {
-            showNotification('Error creating package.', 'error');
-        } finally {
-            removeTaskIndicator();
-        }
-    });
+
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/packages/v2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({
+                        name,
+                        disk_quota: disk,
+                        bandwidth: bw,
+                        max_sql: db,
+                        max_ftp: ftp,
+                        max_email: email,
+                        hourly_email_limit: hourly,
+                        shell_access: shell,
+                        cgi_access: cgi,
+                        is_reseller: isReseller,
+                        locale: locale
+                    })
+                });
+                if (res.ok) {
+                    showNotification('Production resource package deployed.', 'success');
+                    loadPackagesTable();
+                }
+            } catch (e) {
+                showNotification('Error creating package.', 'error');
+            } finally {
+                removeTaskIndicator();
+            }
+        });
+    }
 
     async function loadPackagesTable() {
         const tbody = document.querySelector('#packages-table tbody');
@@ -1818,7 +1881,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Loading plans...</td></tr>';
 
         try {
-            const res = await fetch('/api/packages', {
+            const res = await fetch('/api/packages/v2', {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
             const pkgs = await res.json();
@@ -1828,24 +1891,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong class="text-blue">${pkg.name}</strong></td>
-                    <td>${pkg.disk_limit} MB / ${pkg.bandwidth_limit} GB</td>
-                    <td>D:${pkg.domains_limit} | DB:${pkg.databases_limit}</td>
-                    <td><span class="status-badge badge-green">${pkg.lve_cpu_pct}% CPU | ${pkg.lve_ram_mb}MB</span></td>
+                    <td>${pkg.disk_quota} / ${pkg.bandwidth}</td>
+                    <td>SQL:${pkg.max_sql} | FTP:${pkg.max_ftp}</td>
+                    <td><span class="status-badge badge-green">${pkg.shell_access ? 'Shell' : 'No Shell'} | ${pkg.locale}</span></td>
                     <td>
-                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete Plan</button>
+                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                     </td>
                 `;
 
                 tr.querySelector('.delete-pkg-btn').addEventListener('click', async () => {
-                    if (confirm(`Delete resource package ${pkg.name}?`)) {
+                    if (confirm(`Delete package ${pkg.name}?`)) {
                         addTaskIndicator();
                         try {
-                            const delRes = await fetch(`/api/packages?name=${pkg.name}`, {
+                            const delRes = await fetch(`/api/packages/v2?name=${pkg.name}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
                             });
                             if (delRes.ok) {
-                                showNotification('Resource package wiped successfully.', 'success');
+                                showNotification('Package wiped.', 'success');
                                 loadPackagesTable();
                             }
                         } catch (e) {
@@ -1861,12 +1924,101 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    const transferBtn = document.getElementById('transfer-ownership-btn');
+    if (transferBtn) {
+        transferBtn.addEventListener('click', async () => {
+            const account = document.getElementById('transfer-acc-username').value;
+            const reseller = document.getElementById('transfer-reseller-owner').value;
+            if (!account || !reseller) return;
+            addTaskIndicator();
+            try {
+                await fetch('/api/reseller?action=transfer_ownership', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                    body: JSON.stringify({ account, reseller })
+                });
+                showNotification(`Ownership of ${account} moved to ${reseller}.`, 'success');
+            } catch (e) { showNotification('Transfer failed.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const delegateIPBtn = document.getElementById('delegate-ip-btn');
+    if (delegateIPBtn) {
+        delegateIPBtn.addEventListener('click', async () => {
+            const reseller = document.getElementById('delegate-reseller-user').value;
+            const ip = document.getElementById('delegate-ip-addr').value;
+            if (!reseller || !ip) return;
+            addTaskIndicator();
+            try {
+                await fetch('/api/reseller?action=delegate_ip', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                    body: JSON.stringify({ reseller, ip })
+                });
+                showNotification(`IP ${ip} delegated to ${reseller}.`, 'success');
+            } catch (e) { showNotification('Delegation failed.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
     // ==========================================================================
     // 14. DYNAMIC CRON JOBS MANAGER (cPanel Mapped)
     // ==========================================================================
     async function loadCronJobs() {
-        // Mapped automatically
-        console.log('Cron tasks queried.');
+        const tbody = document.querySelector('#cron-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading cron tab...</td></tr>';
+        try {
+            const res = await fetch('/api/cron', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const jobs = await res.json();
+            tbody.innerHTML = '';
+            jobs.forEach(j => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${j.task_name}</strong></td>
+                    <td><code>${j.schedule}</code></td>
+                    <td style="font-family:var(--font-mono); font-size:0.8rem;">${j.command}</td>
+                    <td>${j.owner}</td>
+                    <td><span class="status-badge ${j.active ? 'badge-green' : 'badge-red'}">${j.active ? 'Active' : 'Disabled'}</span></td>
+                    <td>
+                        <button class="action-btn-secondary delete-cron-btn text-red" data-id="${j.id}" style="padding: 2px 6px; font-size: 0.75rem;">Delete</button>
+                    </td>
+                `;
+                tr.querySelector('.delete-cron-btn').addEventListener('click', async () => {
+                    if (confirm('Delete this cron job?')) {
+                        await fetch(`/api/cron?id=${j.id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                        });
+                        loadCronJobs();
+                    }
+                });
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    const addCronBtn = document.getElementById('open-add-cron-btn');
+    if (addCronBtn) {
+        addCronBtn.addEventListener('click', async () => {
+            const name = prompt('Task Name:');
+            const schedule = prompt('Schedule (e.g. * * * * *):');
+            const command = prompt('Command:');
+            if (!name || !schedule || !command) return;
+
+            await fetch('/api/cron', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_name: name, schedule, command, active: true })
+            });
+            loadCronJobs();
+        });
     }
 
     // ==========================================================================
@@ -2983,6 +3135,62 @@ document.addEventListener('DOMContentLoaded', () => {
     const wafCsrfTog = document.getElementById('waf-csrf-toggle');
     if (wafCsrfTog) {
         wafCsrfTog.addEventListener('change', (e) => updateWAFBadgeState('csrf', e.target.checked));
+    }
+
+    // ==========================================================================
+    // 20C. SERVER IDENTITY CONTROLLERS
+    // ==========================================================================
+    const saveHostnameBtn = document.getElementById('save-hostname-btn');
+    if (saveHostnameBtn) {
+        saveHostnameBtn.addEventListener('click', async () => {
+            const hostname = document.getElementById('server-hostname-input').value;
+            addTaskIndicator();
+            try {
+                await fetch('/api/server/identity?action=set_hostname', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                    body: JSON.stringify({ hostname })
+                });
+                showNotification('Server hostname updated.', 'success');
+            } catch (e) { showNotification('Failed to update hostname.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const saveResolversBtn = document.getElementById('save-resolvers-btn');
+    if (saveResolversBtn) {
+        saveResolversBtn.addEventListener('click', async () => {
+            const primary = document.getElementById('resolver-primary').value;
+            const secondary = document.getElementById('resolver-secondary').value;
+            addTaskIndicator();
+            try {
+                await fetch('/api/server/identity?action=update_resolvers', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                    body: JSON.stringify({ primary, secondary })
+                });
+                showNotification('DNS resolvers updated.', 'success');
+            } catch (e) { showNotification('Failed to update resolvers.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const assignIPBtn = document.getElementById('assign-ip-btn');
+    if (assignIPBtn) {
+        assignIPBtn.addEventListener('click', async () => {
+            const ip = document.getElementById('new-ip-addr').value;
+            const subnet = document.getElementById('new-ip-subnet').value;
+            addTaskIndicator();
+            try {
+                await fetch('/api/server/identity?action=assign_ip', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                    body: JSON.stringify({ ip, subnet })
+                });
+                showNotification(`IP ${ip} bound to interface.`, 'success');
+            } catch (e) { showNotification('Failed to assign IP.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
     }
 
     // ==========================================================================

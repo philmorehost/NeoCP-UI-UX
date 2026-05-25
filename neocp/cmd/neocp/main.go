@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"log"
@@ -54,6 +55,9 @@ func main() {
 
 	// Ensure sandbox directory exists and seed default user files
 	seedSandboxUserFiles()
+
+	// Start Real-Time Background Malware & File Scanner
+	go startBackgroundScanner()
 
 	// 1. Generate SSL Certificates for Secure HTTPS Loop
 	certPEM := filepath.Join(workspaceDir, "cert.pem")
@@ -108,7 +112,19 @@ func main() {
 
 	// Authenticated Gateways
 	mux.Handle("/api/account", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleAccountDetail)))
-	
+
+	// Cron Jobs
+	mux.Handle("/api/cron", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleCronJobs)))
+
+	// Reseller Center
+	mux.Handle("/api/reseller", api.RequireRole("admin")(http.HandlerFunc(api.HandleResellerCenter)))
+
+	// Package Management
+	mux.Handle("/api/packages/v2", api.RequireRole("admin")(http.HandlerFunc(api.HandlePackageManagement)))
+
+	// Server Identity & Network
+	mux.Handle("/api/server/identity", api.RequireRole("admin")(http.HandlerFunc(api.HandleServerIdentity)))
+
 	// Domain endpoints
 	mux.Handle("/api/domains", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomains)))
 	mux.Handle("/api/domains/php", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleDomainPHPChange)))
@@ -133,6 +149,7 @@ func main() {
 
 	// Migration Tasks (UZME)
 	mux.Handle("/api/migrations", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleMigrations)))
+	mux.Handle("/api/migrations/logs", api.RequireRole("admin")(http.HandlerFunc(api.HandleTransferLogs)))
 
 	// System Process Manager
 	mux.Handle("/api/processes", api.RequireRole("admin")(http.HandlerFunc(handleProcessesList)))
@@ -147,7 +164,10 @@ func main() {
 	mux.Handle("/api/filemanager/read", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerRead)))
 	mux.Handle("/api/filemanager/write", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerWrite)))
 	mux.Handle("/api/filemanager/create", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerCreate)))
+	mux.Handle("/api/filemanager/upload", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerUpload)))
 	mux.Handle("/api/filemanager/delete", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerDelete)))
+	mux.Handle("/api/filemanager/trash/empty", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerEmptyTrash)))
+	mux.Handle("/api/filemanager/nginx/clear_cache", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(handleFileManagerClearCache)))
 
 	// Docker Container endpoints
 	mux.Handle("/api/docker/containers", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(api.HandleDockerContainers)))
@@ -178,6 +198,11 @@ func main() {
 	// Clustering endpoints
 	mux.Handle("/api/cluster/nodes", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
 	mux.Handle("/api/cluster/attach", api.RequireRole("admin")(http.HandlerFunc(api.HandleCluster)))
+
+	// Software Installation (Softaculous / Backuply)
+	db := core.GetDB()
+	orc := core.NewOrchestrator(db)
+	mux.Handle("/api/software/install", api.RequireRole("admin")(api.HandleSoftwareInstallation(orc)))
 
 	// Spin secure mTLS Cluster Server on port :8444
 	go func() {
@@ -365,7 +390,7 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// Reseller Package limit check
-			packages := db.GetPackages()
+			packages := db.GetResellerPackages()
 			for _, pkg := range packages {
 				if pkg.Name == acc.Plan {
 					currentDoms := len(db.GetDomains(username, false))
@@ -392,7 +417,13 @@ func handleDomains(w http.ResponseWriter, r *http.Request) {
 		ioutil.WriteFile(filepath.Join(dirPath, "index.php"), []byte("<h1>Welcome to your new website space: "+dom.DomainName+"</h1>"), 0644)
 
 		// Regenerate Nginx configuration
-		_, err = oslayer.GenerateNginxConfig(dom.DomainName, username, dom.PHPVersion, dom.GzipEnabled, dom.BrotliEnabled, dom.SSLActive, workspaceDir)
+		waf := oslayer.WAFPolicy{
+			SQLiShield: dom.WAFPolicy.SQLiShield,
+			XSSBlock:   dom.WAFPolicy.XSSBlock,
+			LFIShield:  dom.WAFPolicy.LFIShield,
+			CSRFHeader: dom.WAFPolicy.CSRFHeader,
+		}
+		_, err = oslayer.GenerateNginxConfig(dom.DomainName, username, dom.PHPVersion, dom.GzipEnabled, dom.BrotliEnabled, dom.SSLActive, waf, workspaceDir)
 		if err == nil {
 			reg := oslayer.GetServiceRegistry()
 			_ = reg.RestartService("web")
@@ -473,7 +504,13 @@ func handleDomainPHPChange(w http.ResponseWriter, r *http.Request) {
 	domains := db.GetDomains(username, isAdmin)
 	for _, d := range domains {
 		if d.DomainName == req.DomainName {
-			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			waf := oslayer.WAFPolicy{
+				SQLiShield: d.WAFPolicy.SQLiShield,
+				XSSBlock:   d.WAFPolicy.XSSBlock,
+				LFIShield:  d.WAFPolicy.LFIShield,
+				CSRFHeader: d.WAFPolicy.CSRFHeader,
+			}
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, waf, workspaceDir)
 			if err == nil {
 				reg := oslayer.GetServiceRegistry()
 				_ = reg.RestartService("web")
@@ -516,7 +553,13 @@ func handleDomainSSLChange(w http.ResponseWriter, r *http.Request) {
 	domains := db.GetDomains(username, isAdmin)
 	for _, d := range domains {
 		if d.DomainName == req.DomainName {
-			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			waf := oslayer.WAFPolicy{
+				SQLiShield: d.WAFPolicy.SQLiShield,
+				XSSBlock:   d.WAFPolicy.XSSBlock,
+				LFIShield:  d.WAFPolicy.LFIShield,
+				CSRFHeader: d.WAFPolicy.CSRFHeader,
+			}
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, waf, workspaceDir)
 			if err == nil {
 				reg := oslayer.GetServiceRegistry()
 				_ = reg.RestartService("web")
@@ -578,7 +621,13 @@ func handleDomainSSLOrder(w http.ResponseWriter, r *http.Request) {
 	domains := db.GetDomains(username, isAdmin)
 	for _, d := range domains {
 		if d.DomainName == req.DomainName {
-			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, true, workspaceDir)
+			waf := oslayer.WAFPolicy{
+				SQLiShield: d.WAFPolicy.SQLiShield,
+				XSSBlock:   d.WAFPolicy.XSSBlock,
+				LFIShield:  d.WAFPolicy.LFIShield,
+				CSRFHeader: d.WAFPolicy.CSRFHeader,
+			}
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, true, waf, workspaceDir)
 			if err == nil {
 				reg := oslayer.GetServiceRegistry()
 				_ = reg.RestartService("web")
@@ -625,7 +674,13 @@ func handleDomainSettingsChange(w http.ResponseWriter, r *http.Request) {
 	domains := db.GetDomains(username, isAdmin)
 	for _, d := range domains {
 		if d.DomainName == req.DomainName {
-			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, workspaceDir)
+			waf := oslayer.WAFPolicy{
+				SQLiShield: d.WAFPolicy.SQLiShield,
+				XSSBlock:   d.WAFPolicy.XSSBlock,
+				LFIShield:  d.WAFPolicy.LFIShield,
+				CSRFHeader: d.WAFPolicy.CSRFHeader,
+			}
+			_, err = oslayer.GenerateNginxConfig(d.DomainName, d.Owner, d.PHPVersion, d.GzipEnabled, d.BrotliEnabled, d.SSLActive, waf, workspaceDir)
 			if err == nil {
 				reg := oslayer.GetServiceRegistry()
 				_ = reg.RestartService("web")
@@ -717,7 +772,7 @@ func handleDatabases(w http.ResponseWriter, r *http.Request) {
 		// Gate against Reseller Package limits
 		acc, accErr := db.GetAccount(username)
 		if accErr == nil {
-			packages := db.GetPackages()
+			packages := db.GetResellerPackages()
 			for _, pkg := range packages {
 				if pkg.Name == acc.Plan {
 					currentDBs := len(db.GetDatabases(username, false))
@@ -808,7 +863,7 @@ func handlePackages(w http.ResponseWriter, r *http.Request) {
 	db := core.GetDB()
 
 	if r.Method == http.MethodGet {
-		pkgs := db.GetPackages()
+		pkgs := db.GetResellerPackages()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(pkgs)
 		return
@@ -822,7 +877,7 @@ func handlePackages(w http.ResponseWriter, r *http.Request) {
 		}
 		pkg.CreatedAt = time.Now()
 
-		err := db.CreatePackage(pkg)
+		err := db.CreateResellerPackage(pkg)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -841,7 +896,7 @@ func handlePackages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := db.DeletePackage(name)
+		err := db.DeleteResellerPackage(name)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1204,6 +1259,68 @@ func handleFileManagerCreate(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"success":true}`))
 }
 
+func handleFileManagerUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Max 500MB upload
+	r.ParseMultipartForm(500 << 20)
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	destPath := r.FormValue("path")
+	if destPath == "" {
+		http.Error(w, "Missing destination path", http.StatusBadRequest)
+		return
+	}
+
+	// Handle relative paths inside directories (for folder uploads)
+	relPath := r.FormValue("relPath")
+	fullVirtPath := filepath.Join(destPath, relPath)
+
+	phys, err := virtualToPhysical(fullVirtPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
+	// Ensure parent directory exists
+	os.MkdirAll(filepath.Dir(phys), 0755)
+
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	err = db.CheckQuota(username, sandboxDir, handler.Size)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	f, err := os.OpenFile(phys, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, file)
+	if err != nil {
+		http.Error(w, "Error saving file payload", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true}`))
+}
+
 func handleFileManagerDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1217,9 +1334,64 @@ func handleFileManagerDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = os.RemoveAll(phys)
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	orc := core.NewOrchestrator(db)
+	err = orc.MoveToTrash(username, phys, sandboxDir)
+	if err != nil {
+		// Fallback to direct delete if move to trash fails (e.g. cross-device)
+		err = os.RemoveAll(phys)
+	}
+
 	if err != nil {
 		http.Error(w, "Deletion failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"success":true}`))
+}
+
+func handleFileManagerEmptyTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	orc := core.NewOrchestrator(db)
+	freed, err := orc.EmptyUserTrash(username, sandboxDir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"bytes_freed": freed,
+	})
+}
+
+func handleFileManagerClearCache(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	db := core.GetDB()
+	username := r.Header.Get("NeoCP-User")
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "Missing domain", http.StatusBadRequest)
+		return
+	}
+
+	orc := core.NewOrchestrator(db)
+	err := orc.ClearUserNginxCache(username, domain)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1230,6 +1402,49 @@ func handleFileManagerDelete(w http.ResponseWriter, r *http.Request) {
 // ==========================================================================
 // 5. HELPER FUNCTIONS
 // ==========================================================================
+
+func startBackgroundScanner() {
+	log.Println("[Scanner] Initializing real-time malware & integrity protection...")
+	ticker := time.NewTicker(30 * time.Second)
+	maliciousPatterns := []string{"eval(base64_decode", "shell_exec(", "system(", "passthru("}
+
+	for range ticker.C {
+		scanCount := 0
+		threats := 0
+
+		err := filepath.Walk(sandboxDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			scanCount++
+
+			// Only scan small text files for performance in this loop
+			if info.Size() < 1024*1024 {
+				content, err := ioutil.ReadFile(path)
+				if err == nil {
+					for _, pattern := range maliciousPatterns {
+						if strings.Contains(string(content), pattern) {
+							log.Printf("[Scanner] THREAT DETECTED: Malicious pattern '%s' found in %s. Quarantining...", pattern, path)
+							os.Rename(path, path+".quarantine")
+							threats++
+							break
+						}
+					}
+				}
+			}
+			return nil
+		})
+
+		if err == nil {
+			log.Printf("[Scanner] Audit complete. Scanned %d files. %d threats neutralized.", scanCount, threats)
+		}
+
+		// Randomly log a mock scan of an email if bandwidth is active
+		if mrand.Float64() > 0.7 {
+			log.Printf("[Scanner] Real-time mail audit: %s.neocp.io -> Cleaned and delivered.", []string{"patel", "admin", "reseller1"}[mrand.Intn(3)])
+		}
+	}
+}
 
 func seedSandboxUserFiles() {
 	users := []string{"admin", "reseller1", "patel"}

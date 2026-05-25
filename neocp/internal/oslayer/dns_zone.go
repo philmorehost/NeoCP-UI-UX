@@ -7,12 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"neocp/internal/core"
 )
 
+type DNSRecord struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"` // A, AAAA, CNAME, MX, TXT, SRV
+	Name     string `json:"name"` // e.g. "www" or "@"
+	Value    string `json:"value"`
+	TTL      int    `json:"ttl"`
+	Priority int    `json:"priority,omitempty"`
+}
+
 // GenerateBind9ZoneFile compiles BIND9 zone records and writes to dns_zones/<domain>.db
-func GenerateBind9ZoneFile(domainName string, records []core.DNSRecord, workspaceDir string) (string, error) {
+func GenerateBind9ZoneFile(domainName string, records []DNSRecord, workspaceDir string) (string, error) {
 	dnsDir := filepath.Join(workspaceDir, "dns_zones")
 	err := os.MkdirAll(dnsDir, 0755)
 	if err != nil {

@@ -16,7 +16,9 @@ type Account struct {
 	Username       string    `json:"username"`
 	Password       string    `json:"password"`
 	Role           string    `json:"role"` // admin, reseller, customer
+	Owner          string    `json:"owner"`
 	Plan           string    `json:"plan"`
+	IPAddress      string    `json:"ip_address"`
 	Email          string    `json:"email"`
 	DiskUsed       int64     `json:"disk_used"`       // in MB
 	DiskLimit      int64     `json:"disk_limit"`      // in MB
@@ -24,6 +26,15 @@ type Account struct {
 	BandwidthLimit int64     `json:"bandwidth_limit"` // in GB
 	DomainsUsed    int       `json:"domains_used"`
 	DomainsLimit   int       `json:"domains_limit"`
+	ShellAccess    bool      `json:"shell_access"`
+	CGIEnabled     bool      `json:"cgi_enabled"`
+	Locale         string    `json:"locale"`
+	IsSuspended    bool      `json:"is_suspended"`
+	DedicatedIP    string    `json:"dedicated_ip"`
+	SharedIP       string    `json:"shared_ip"`
+	DelegatedIPs   []string  `json:"delegated_ips"`
+	Nameservers    []string  `json:"nameservers"`
+	Privileges     []string  `json:"privileges"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -83,6 +94,31 @@ type CronJob struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type PackageDefinition struct {
+	Name             string    `json:"name"`
+	DiskQuota        string    `json:"disk_quota"` // "10GB", "unlimited"
+	Bandwidth        string    `json:"bandwidth"`
+	MaxSQL           string    `json:"max_sql"`
+	MaxFTP           string    `json:"max_ftp"`
+	MaxEmail         string    `json:"max_email"`
+	MaxSubdomains    string    `json:"max_subdomains"`
+	MaxParkedDomains string    `json:"max_parked_domains"`
+	MaxAddonDomains  string    `json:"max_addon_domains"`
+	MaxPassengerApps string    `json:"max_passenger_apps"`
+	MaxTeamUsers     string    `json:"max_team_users"`
+	HourlyEmailLimit string    `json:"hourly_email_limit"`
+	FailedEmailPct   string    `json:"failed_email_pct"`
+	MaxQuotaPerEmail string    `json:"max_quota_per_email"`
+	IsReseller       bool      `json:"is_reseller"`
+	DedicatedIP      bool      `json:"dedicated_ip"`
+	ShellAccess      bool      `json:"shell_access"`
+	CGIAccess        bool      `json:"cgi_access"`
+	DigestAuth       bool      `json:"digest_auth"`
+	WHMReseller      bool      `json:"whm_reseller"`
+	Locale           string    `json:"locale"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
 type ResellerPackage struct {
 	Name           string    `json:"name"`
 	DiskLimit      int64     `json:"disk_limit"`
@@ -136,6 +172,14 @@ type ClusterNode struct {
 }
 
 
+type ServerSettings struct {
+	Hostname     string   `json:"hostname"`
+	PrimaryDNS   string   `json:"primary_dns"`
+	SecondaryDNS string   `json:"secondary_dns"`
+	SharedIPv4   string   `json:"shared_ipv4"`
+	AvailableIPs []string `json:"available_ips"`
+}
+
 type MigrationTask struct {
 	ID           string    `json:"id"`
 	Owner        string    `json:"owner"`
@@ -150,16 +194,19 @@ type MigrationTask struct {
 
 // DatabaseStore manages the raw file payload with thread-safety
 type DatabaseStore struct {
-	Accounts         map[string]Account         `json:"accounts"`
-	Domains          map[string]Domain          `json:"domains"`
-	Databases        map[string]Database        `json:"databases"`
-	CronJobs         map[string]CronJob         `json:"cron_jobs"`
-	ResellerPackages map[string]ResellerPackage `json:"reseller_packages"`
-	Tickets          map[string]Ticket          `json:"tickets"`
-	DockerContainers map[string]DockerContainer `json:"docker_containers"`
-	MigrationTasks   map[string]MigrationTask   `json:"migration_tasks"`
-	FirewallBlocks   map[string]FirewallBlock   `json:"firewall_blocks"`
-	ClusterNodes     map[string]ClusterNode     `json:"cluster_nodes"`
+	Accounts         map[string]Account           `json:"accounts"`
+	Domains          map[string]Domain            `json:"domains"`
+	Databases        map[string]Database          `json:"databases"`
+	CronJobs         map[string]CronJob           `json:"cron_jobs"`
+	ResellerPackages map[string]ResellerPackage   `json:"reseller_packages"`
+	Packages         map[string]PackageDefinition `json:"packages"`
+	Tickets          map[string]Ticket            `json:"tickets"`
+	DockerContainers map[string]DockerContainer   `json:"docker_containers"`
+	MigrationTasks   map[string]MigrationTask     `json:"migration_tasks"`
+	FirewallBlocks   map[string]FirewallBlock     `json:"firewall_blocks"`
+	ClusterNodes     map[string]ClusterNode       `json:"cluster_nodes"`
+	TransferLogs     []TransferLog                `json:"transfer_logs"`
+	Settings         ServerSettings               `json:"settings"`
 }
 
 type DatabaseEngine struct {
@@ -184,11 +231,19 @@ func GetDB() *DatabaseEngine {
 				Databases:        make(map[string]Database),
 				CronJobs:         make(map[string]CronJob),
 				ResellerPackages: make(map[string]ResellerPackage),
+				Packages:         make(map[string]PackageDefinition),
 				Tickets:          make(map[string]Ticket),
 				DockerContainers: make(map[string]DockerContainer),
 				MigrationTasks:   make(map[string]MigrationTask),
 				FirewallBlocks:   make(map[string]FirewallBlock),
 				ClusterNodes:     make(map[string]ClusterNode),
+				Settings: ServerSettings{
+					Hostname:     "neocp-master.local",
+					PrimaryDNS:   "8.8.8.8",
+					SecondaryDNS: "8.8.4.4",
+					SharedIPv4:   "192.168.1.100",
+					AvailableIPs: []string{"192.168.1.100", "192.168.1.101", "192.168.1.102"},
+				},
 			},
 		}
 		engineInstance.load()
@@ -223,6 +278,9 @@ func (db *DatabaseEngine) load() {
 		if loaded.ResellerPackages != nil {
 			db.store.ResellerPackages = loaded.ResellerPackages
 		}
+		if loaded.Packages != nil {
+			db.store.Packages = loaded.Packages
+		}
 		if loaded.Tickets != nil {
 			db.store.Tickets = loaded.Tickets
 		}
@@ -238,6 +296,7 @@ func (db *DatabaseEngine) load() {
 		if loaded.ClusterNodes != nil {
 			db.store.ClusterNodes = loaded.ClusterNodes
 		}
+		db.store.Settings = loaded.Settings
 	}
 }
 
@@ -380,6 +439,43 @@ func (db *DatabaseEngine) seedDefaultData() {
 			Active:    true,
 			CreatedAt: time.Now(),
 		}
+		db.store.CronJobs["sys_trash_purge"] = CronJob{
+			ID:        "sys_trash_purge",
+			Owner:     "admin",
+			TaskName:  "Automatic Trash Purge (30 Days)",
+			Command:   "/usr/local/neocp/bin/filemanager --purge-trash 30d",
+			Schedule:  "0 2 * * *", // 2 AM daily
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+		db.store.CronJobs["sys_backup_purge"] = CronJob{
+			ID:        "sys_backup_purge",
+			Owner:     "admin",
+			TaskName:  "Old Backup Purge",
+			Command:   "/usr/local/neocp/bin/backup --purge 30d",
+			Schedule:  "@daily",
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+		// Default necessary cron jobs
+		db.store.CronJobs["sys_scan_1"] = CronJob{
+			ID:        "sys_scan_1",
+			Owner:     "admin",
+			TaskName:  "System-Wide Malware Scan",
+			Command:   "/usr/local/neocp/bin/scan --all",
+			Schedule:  "0 0 * * 0", // Weekly
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+		db.store.CronJobs["sys_file_scan"] = CronJob{
+			ID:        "sys_file_scan",
+			Owner:     "admin",
+			TaskName:  "File Integrity Monitor",
+			Command:   "/usr/local/neocp/bin/filecheck",
+			Schedule:  "@daily",
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
 	}
 
 	// Seed a support ticket
@@ -420,6 +516,17 @@ func (db *DatabaseEngine) Authenticate(username, password string) (*Account, err
 		return nil, errors.New("invalid username or password")
 	}
 	return &acc, nil
+}
+
+func (db *DatabaseEngine) GetAccounts() []Account {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var accounts []Account
+	for _, acc := range db.store.Accounts {
+		accounts = append(accounts, acc)
+	}
+	return accounts
 }
 
 func (db *DatabaseEngine) GetAccount(username string) (*Account, error) {
@@ -464,6 +571,71 @@ func (db *DatabaseEngine) CreateDomain(dom Domain) error {
 	}
 
 	db.store.Domains[dom.DomainName] = dom
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetTransferLogs() []TransferLog {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	if db.store.TransferLogs == nil {
+		return []TransferLog{}
+	}
+	return db.store.TransferLogs
+}
+
+func (db *DatabaseEngine) AddTransferLog(tl TransferLog) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.store.TransferLogs = append(db.store.TransferLogs, tl)
+	db.save()
+}
+
+func (db *DatabaseEngine) CreateAccount(acc Account) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.Accounts[acc.Username]; exists {
+		return errors.New("account already exists")
+	}
+	db.store.Accounts[acc.Username] = acc
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) DeleteAccount(username string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.Accounts[username]; !exists {
+		return errors.New("account not found")
+	}
+	delete(db.store.Accounts, username)
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetSettings() ServerSettings {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.store.Settings
+}
+
+func (db *DatabaseEngine) UpdateSettings(s ServerSettings) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.store.Settings = s
+	db.save()
+}
+
+func (db *DatabaseEngine) UpdateAccount(acc Account) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.Accounts[acc.Username]; !exists {
+		return errors.New("account not found")
+	}
+	db.store.Accounts[acc.Username] = acc
 	db.save()
 	return nil
 }
@@ -654,7 +826,7 @@ func (db *DatabaseEngine) DeleteCronJob(id string) error {
 	return nil
 }
 
-func (db *DatabaseEngine) GetPackages() []ResellerPackage {
+func (db *DatabaseEngine) GetResellerPackages() []ResellerPackage {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -665,7 +837,7 @@ func (db *DatabaseEngine) GetPackages() []ResellerPackage {
 	return pkgs
 }
 
-func (db *DatabaseEngine) CreatePackage(pkg ResellerPackage) error {
+func (db *DatabaseEngine) CreateResellerPackage(pkg ResellerPackage) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -677,7 +849,7 @@ func (db *DatabaseEngine) CreatePackage(pkg ResellerPackage) error {
 	return nil
 }
 
-func (db *DatabaseEngine) DeletePackage(name string) error {
+func (db *DatabaseEngine) DeleteResellerPackage(name string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -685,6 +857,41 @@ func (db *DatabaseEngine) DeletePackage(name string) error {
 		return errors.New("package not found")
 	}
 	delete(db.store.ResellerPackages, name)
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) GetPackages() []PackageDefinition {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var pkgs []PackageDefinition
+	for _, pkg := range db.store.Packages {
+		pkgs = append(pkgs, pkg)
+	}
+	return pkgs
+}
+
+func (db *DatabaseEngine) CreatePackage(pkg PackageDefinition) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.Packages[pkg.Name]; exists {
+		return errors.New("package name already exists")
+	}
+	db.store.Packages[pkg.Name] = pkg
+	db.save()
+	return nil
+}
+
+func (db *DatabaseEngine) DeletePackage(name string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.store.Packages[name]; !exists {
+		return errors.New("package not found")
+	}
+	delete(db.store.Packages, name)
 	db.save()
 	return nil
 }

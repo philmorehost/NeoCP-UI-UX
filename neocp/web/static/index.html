@@ -80,6 +80,9 @@
                     <li class="menu-item" data-target="filemanager">
                         <span class="item-icon">📁</span> File Explorer
                     </li>
+                    <li class="menu-item" data-target="cron">
+                        <span class="item-icon">⏰</span> Cron Jobs
+                    </li>
                     <li class="menu-item" data-target="databases">
                         <span class="item-icon">🗄️</span> Databases Core
                     </li>
@@ -106,6 +109,9 @@
 
                 <div class="menu-section">Enterprise Ecosystem</div>
                 <ul class="menu-list">
+                    <li class="menu-item admin-only" data-target="server-identity">
+                        <span class="item-icon">⚙️</span> Server Identity
+                    </li>
                     <li class="menu-item" data-target="migration">
                         <span class="item-icon">🚀</span> UZME Migration Engine
                     </li>
@@ -450,13 +456,14 @@
                     <div class="view-header-bar">
                         <h3>Interactive Web File Explorer</h3>
                         <div class="header-button-group">
+                            <button class="action-btn-secondary" id="filemanager-empty-trash-btn">🗑️ Empty Trash</button>
                             <button class="action-btn-secondary" id="filemanager-newfile-btn">+ New File</button>
                             <button class="action-btn-secondary" id="filemanager-newdir-btn">+ New Folder</button>
                             <button class="action-btn" id="filemanager-webdav-btn">WebDAV: Off</button>
                         </div>
                     </div>
 
-                    <div class="filemanager-grid">
+                    <div class="filemanager-grid" id="filemanager-drop-zone">
                         <!-- Directory Tree Pane -->
                         <aside class="filemanager-sidebar glass">
                             <h4>Directory Tree</h4>
@@ -562,7 +569,7 @@ SecRuleEngine On
 SecRequestBodyAccess On
 SecRule REQUEST_HEADERS:User-Agent "sqlmap" "id:10001,phase:1,deny,status:403,log,msg:'Brute Force scanner blocked'"
 SecRule REQUEST_URI "@contains union select" "id:10002,phase:2,deny,status:403,log,msg:'SQL injection attempt detected'"
-SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS attempt mitigated'"</textarea>
+SecRule ARGS "@contains &lt;script&gt;" "id:10003,phase:2,deny,status:403,log,msg:'XSS attempt mitigated'"</textarea>
                                 <button class="action-btn" id="save-modsec-rules-btn">Recompile Ruleset</button>
                             </div>
                         </div>
@@ -716,6 +723,7 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <div class="viewport-view" id="view-software">
                     <div class="view-header-bar">
                         <h3>Softaculous Applications & Runtime Selectors</h3>
+                        <button class="action-btn admin-only" id="install-softaculous-btn">🚀 Deploy Softaculous Core</button>
                     </div>
 
                     <div class="software-grid">
@@ -870,7 +878,14 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                 <label>Target Domain to Provision</label>
                                 <input type="text" id="migration-target-domain" placeholder="e.g. digitalneo.net" value="blog.digitalneo.net">
                             </div>
-                            <button class="action-btn" id="start-migration-btn" style="margin-top: 15px;">Initiate Zero-Downtime Migration</button>
+                            <div class="input-group admin-only" style="margin-top: 15px;">
+                                <label>Bulk Account Migration (CSV list)</label>
+                                <textarea id="migration-bulk-list" placeholder="user1,user2,user3" rows="3" class="security-textarea"></textarea>
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:15px;">
+                                <button class="action-btn" id="start-migration-btn">Single Account</button>
+                                <button class="action-btn admin-only" id="start-bulk-migration-btn">Bulk Migration</button>
+                            </div>
                         </div>
 
                         <!-- Live Sync logs -->
@@ -889,6 +904,29 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                 <div class="log-line text-muted">[System] Standing by for migration initiation credentials.</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: REVIEW TRANSFERS -->
+                <div class="viewport-view" id="view-transfer-logs">
+                    <div class="view-header-bar">
+                        <h3>Review Transfers and Restores</h3>
+                    </div>
+                    <div class="split-card glass">
+                        <h4>Migration History Log</h4>
+                        <table class="neocp-data-table" id="transfer-logs-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Status</th>
+                                    <th>Created At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -961,49 +999,212 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <!-- VIEW 10: RESELLER MASTER -->
                 <div class="viewport-view" id="view-reseller">
                     <div class="view-header-bar">
-                        <h3>WHM Master Reseller & WHMCS Sync Manager</h3>
+                        <h3>WHM Master Reseller & Reseller Center</h3>
                     </div>
 
                     <div class="reseller-grid">
                         <div class="split-card glass">
-                            <h4>WHM Resource Package Provisioner</h4>
-                            <p class="meta-desc">Design customized subscription plans for your resellers and sub-users.</p>
+                            <h4>Reseller Center</h4>
+                            <p class="meta-desc">Manage resellers, change ownership, and delegate IP addresses.</p>
                             
+                            <h5 style="margin-top: 20px;">Active Accounts Tree</h5>
+                            <div class="table-container-scroll" style="max-height: 300px; margin-bottom: 25px; overflow-y: auto;">
+                                <table class="neocp-data-table" id="reseller-accounts-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Account</th>
+                                            <th>Owner</th>
+                                            <th>Plan</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reseller-accounts-body">
+                                        <!-- Injected via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <h5 style="margin-top: 25px;">Create New NeoCP Account</h5>
+                            <div class="db-management-panel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; background: rgba(255,255,255,0.02); padding: 20px; border-radius: 8px;">
+                                <div class="input-group">
+                                    <label>Domain</label>
+                                    <input type="text" id="new-acc-domain" placeholder="e.g. example.com">
+                                </div>
+                                <div class="input-group">
+                                    <label>Username</label>
+                                    <input type="text" id="new-acc-user" placeholder="e.g. user123">
+                                </div>
+                                <div class="input-group">
+                                    <label>Password</label>
+                                    <input type="password" id="new-acc-pass" placeholder="••••••••">
+                                </div>
+                                <div class="input-group">
+                                    <label>Email</label>
+                                    <input type="email" id="new-acc-email" placeholder="user@example.com">
+                                </div>
+                                <div class="input-group">
+                                    <label>Package</label>
+                                    <select id="new-acc-package" class="role-selector">
+                                        <!-- Injected via JS -->
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Role</label>
+                                    <select id="new-acc-role" class="role-selector">
+                                        <option value="customer">Customer</option>
+                                        <option value="reseller">Reseller</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column: span 2;">
+                                    <button class="action-btn" id="create-account-submit-btn" style="width: 100%;">Create Account</button>
+                                </div>
+                            </div>
+
+                            <h5 style="margin-top: 25px;">Account Ownership Transfer</h5>
                             <div class="input-group">
-                                <label>Package Package Name</label>
-                                <input type="text" id="pkg-name-input" placeholder="e.g. Silver-Pack">
+                                <label>Target Account Username</label>
+                                <input type="text" id="transfer-acc-username" placeholder="e.g. user123">
                             </div>
-                            <div class="ini-grid">
-                                <div class="input-group">
-                                    <label>Disk Capacity Limit (MB)</label>
-                                    <input type="number" id="pkg-disk-input" value="5000">
-                                </div>
-                                <div class="input-group">
-                                    <label>Bandwidth Limit (GB)</label>
-                                    <input type="number" id="pkg-bw-input" value="100">
-                                </div>
-                                <div class="input-group">
-                                    <label>Max Domains</label>
-                                    <input type="number" id="pkg-domains-input" value="10">
-                                </div>
-                                <div class="input-group">
-                                    <label>Max Databases</label>
-                                    <input type="number" id="pkg-db-input" value="10">
+                            <div class="input-group">
+                                <label>New Reseller Owner</label>
+                                <input type="text" id="transfer-reseller-owner" placeholder="e.g. reseller1">
+                            </div>
+                            <button class="action-btn" id="transfer-ownership-btn">Transfer Ownership</button>
+
+                            <h5 style="margin-top: 25px;">IP Delegation</h5>
+                            <div class="input-group">
+                                <label>Reseller Username</label>
+                                <input type="text" id="delegate-reseller-user" placeholder="e.g. reseller1">
+                            </div>
+                            <div class="input-group">
+                                <label>IP Address to Delegate</label>
+                                <input type="text" id="delegate-ip-addr" placeholder="e.g. 192.168.1.50">
+                            </div>
+                            <button class="action-btn-secondary" id="delegate-ip-btn">Delegate Dedicated IP</button>
+                        </div>
+
+                        <div class="split-card glass" style="flex: 2;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <span style="font-size: 24px;">➕</span>
+                                <h4 style="margin: 0;">Add a Package</h4>
+                            </div>
+                            <p class="meta-desc">Design customized subscription plans for your resellers and sub-users.</p>
+
+                            <div class="input-group" style="margin-top: 20px;">
+                                <label>Package Name</label>
+                                <input type="text" id="pkg-name-input" placeholder="e.g. Silver-Pack" style="max-width: 400px;">
+                            </div>
+
+                            <div class="package-section" style="margin-top: 25px;">
+                                <h5 style="color: var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 15px;">Resources</h5>
+                                <div class="ini-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                                    <div class="input-group">
+                                        <label>Disk Space Quota (e.g. 10GB, unlimited)</label>
+                                        <input type="text" id="pkg-disk-input" value="10240">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Monthly Bandwidth (e.g. 1TB, unlimited)</label>
+                                        <input type="text" id="pkg-bw-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max FTP Accounts</label>
+                                        <input type="text" id="pkg-ftp-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Email Accounts</label>
+                                        <input type="text" id="pkg-email-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max SQL Databases</label>
+                                        <input type="text" id="pkg-db-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Sub Domains</label>
+                                        <input type="text" id="pkg-sub-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Parked Domains</label>
+                                        <input type="text" id="pkg-parked-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Addon Domains</label>
+                                        <input type="text" id="pkg-addon-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Passenger Applications</label>
+                                        <input type="text" id="pkg-passenger-input" value="5">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Hourly Email Relay</label>
+                                        <input type="text" id="pkg-hourly-email-input" value="100">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Failed/Deferred Email %</label>
+                                        <input type="text" id="pkg-failed-email-input" value="unlimited">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Quota per Email Address</label>
+                                        <input type="text" id="pkg-email-quota-input" value="1024">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Team Users with Roles</label>
+                                        <input type="text" id="pkg-team-users-input" value="unlimited">
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <h5 style="margin-top: 20px;">LVE / Cgroups Resource Throttling</h5>
-                            <div class="ini-grid">
-                                <div class="input-group">
-                                    <label>CPU Limit Allocation (%)</label>
-                                    <input type="number" id="pkg-cpu-input" value="50">
-                                </div>
-                                <div class="input-group">
-                                    <label>Memory (RAM) Limit (MB)</label>
-                                    <input type="number" id="pkg-ram-input" value="1024">
+
+                            <div class="package-section" style="margin-top: 30px;">
+                                <h5 style="color: var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 15px;">Settings & Options</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                                    <div>
+                                        <label style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; display: block;">Core Features</label>
+                                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                                            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                                <input type="checkbox" id="pkg-dedicated-ip-toggle"> Dedicated IP (Admins Only)
+                                            </label>
+                                            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                                <input type="checkbox" id="pkg-shell-toggle" checked> Shell Access
+                                            </label>
+                                            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                                <input type="checkbox" id="pkg-cgi-toggle" checked> CGI Access
+                                            </label>
+                                            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                                <input type="checkbox" id="pkg-digest-auth-toggle"> Digest Auth at Creation
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="input-group">
+                                            <label>Default Locale</label>
+                                            <select id="pkg-locale-select" class="role-selector" style="max-width: 100%;">
+                                                <option value="en" selected>English (United States)</option>
+                                                <option value="es">Español (Spanish)</option>
+                                                <option value="fr">Français (French)</option>
+                                                <option value="de">Deutsch (German)</option>
+                                                <option value="pt">Português (Portuguese)</option>
+                                                <option value="ru">Русский (Russian)</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy WHM Package</button>
+
+                            <div class="package-section" style="margin-top: 30px;">
+                                <h5 style="color: var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 15px;">Package Extensions</h5>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                        <input type="checkbox" id="pkg-reseller-toggle"> WHMReseller Settings (Auto-promote to Reseller)
+                                    </label>
+                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                        <input type="checkbox" id="pkg-wptoolkit-toggle"> WP Toolkit (Premium)
+                                    </label>
+                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                                        <input type="checkbox" id="pkg-lve-toggle"> LVE Settings (Resource Isolation)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button class="action-btn" id="create-package-btn" style="margin-top: 35px; width: 200px; padding: 15px;">Add Package</button>
                         </div>
 
                         <!-- Active Packages -->
@@ -1072,7 +1273,10 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <div class="viewport-view" id="view-backups">
                     <div class="view-header-bar">
                         <h3>Monolithic Backup & Recovery Manager</h3>
-                        <button class="action-btn" id="trigger-backup-btn">⚡ Create Full Backup</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="action-btn-secondary admin-only" id="install-backuply-btn">🛡️ Install Backuply Enterprise</button>
+                            <button class="action-btn" id="trigger-backup-btn">⚡ Create Full Backup</button>
+                        </div>
                     </div>
 
                     <div class="split-card glass" style="margin-top: 15px;">
@@ -1098,6 +1302,7 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                 </div>
 
                 <!-- VIEW: DOCKER CONTAINERS -->
@@ -1175,6 +1380,72 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <button class="action-btn-secondary install-docker-template-btn" data-image="postgres:alpine" data-name="postgres-db" data-ports="5432:5432" style="padding: 6px 12px; margin: 0; width: auto;">Run Stack</button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CRON JOBS -->
+                <div class="viewport-view" id="view-cron">
+                    <div class="view-header-bar">
+                        <h3>Task Scheduler & Cron Jobs</h3>
+                        <button class="action-btn" id="open-add-cron-btn">+ Add New Cron Job</button>
+                    </div>
+                    <div class="split-card glass">
+                        <h4>Scheduled System Tasks</h4>
+                        <table class="neocp-data-table" id="cron-table">
+                            <thead>
+                                <tr>
+                                    <th>Task Name</th>
+                                    <th>Schedule</th>
+                                    <th>Command</th>
+                                    <th>Owner</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW: SERVER IDENTITY -->
+                <div class="viewport-view" id="view-server-identity">
+                    <div class="view-header-bar">
+                        <h3>Server Identity & Network Configuration</h3>
+                    </div>
+                    <div class="security-grid">
+                        <div class="split-card glass">
+                            <h4>Hostname & Resolvers</h4>
+                            <div class="input-group">
+                                <label>System Hostname</label>
+                                <input type="text" id="server-hostname-input" value="neocp.master.node">
+                                <button class="action-btn" style="margin-top: 10px;" id="save-hostname-btn">Update Hostname</button>
+                            </div>
+                            <h5 style="margin-top: 25px;">DNS Resolvers (/etc/resolv.conf)</h5>
+                            <div class="input-group">
+                                <label>Primary Resolver</label>
+                                <input type="text" id="resolver-primary" value="8.8.8.8">
+                            </div>
+                            <div class="input-group">
+                                <label>Secondary Resolver</label>
+                                <input type="text" id="resolver-secondary" value="1.1.1.1">
+                            </div>
+                            <button class="action-btn-secondary" id="save-resolvers-btn">Save Resolvers</button>
+                        </div>
+                        <div class="split-card glass">
+                            <h4>Network Interfaces & IP Routing</h4>
+                            <p class="meta-desc">Bind additional IPv4 addresses to server adapters.</p>
+                            <div class="input-group">
+                                <label>New IPv4 Address</label>
+                                <input type="text" id="new-ip-addr" placeholder="e.g. 192.168.1.51">
+                            </div>
+                            <div class="input-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="new-ip-subnet" value="255.255.255.0">
+                            </div>
+                            <button class="action-btn" id="assign-ip-btn">Assign IP to Interface</button>
                         </div>
                     </div>
                 </div>

@@ -174,11 +174,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetViewId === 'filemanager') loadFileExplorer();
         if (targetViewId === 'domains') loadDomainsTable();
         if (targetViewId === 'databases') loadDatabasesTable();
-        if (targetViewId === 'reseller') loadPackagesTable();
+        if (targetViewId === 'reseller') {
+            loadPackagesTable();
+            loadResellerAccounts();
+        }
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
         if (targetViewId === 'clustering') loadClusterNodes();
+        if (targetViewId === 'transfer-logs') loadTransferLogs();
+        if (targetViewId === 'server-identity') loadServerIdentity();
+        if (targetViewId === 'cron') loadCronJobs();
         if (targetViewId === 'security') {
             loadFirewallBlocks();
             loadDomainsTable();
@@ -950,9 +956,80 @@ document.addEventListener('DOMContentLoaded', () => {
         showNotification(`WebDAV network storage adapter ${webdavEnabled ? 'activated on port 8081' : 'disabled'}.`, 'info');
     });
 
+    // Drag & Drop Upload Enhancer
+    const dropZone = document.getElementById('filemanager-drop-zone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        async function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let items = e.dataTransfer.items;
+
+            showNotification(`Processing ${items.length} items for upload...`, 'info');
+
+            for (let i = 0; i < items.length; i++) {
+                let item = items[i].webkitGetAsEntry();
+                if (item) {
+                    await uploadFileSystemEntry(item, "");
+                }
+            }
+            showNotification(`Upload sequence completed.`, 'success');
+            loadFileExplorer();
+        }
+
+        async function uploadFileSystemEntry(entry, path) {
+            if (entry.isFile) {
+                await uploadFile(entry, path);
+            } else if (entry.isDirectory) {
+                let dirReader = entry.createReader();
+                let entries = await new Promise((resolve) => dirReader.readEntries(resolve));
+                for (let i = 0; i < entries.length; i++) {
+                    await uploadFileSystemEntry(entries[i], path + entry.name + "/");
+                }
+            }
+        }
+
+        async function uploadFile(fileEntry, relPath) {
+            return new Promise((resolve) => {
+                fileEntry.file(async (file) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('path', currentPath);
+                    formData.append('relPath', relPath + file.name);
+
+                    addTaskIndicator();
+                    try {
+                        const res = await fetch('/api/filemanager/upload', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` },
+                            body: formData
+                        });
+                        if (!res.ok) {
+                            const data = await res.json();
+                            showNotification(`Failed to upload ${file.name}: ${data.error}`, 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        removeTaskIndicator();
+                        resolve();
+                    }
+                });
+            });
+        }
+    }
+
     async function loadFileExplorer() {
         currentDirLabel.textContent = currentPath;
         const tbody = document.querySelector('#filemanager-table tbody');
+        if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading user files sandbox...</td></tr>';
 
         try {
@@ -1027,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Delete file
                 tr.querySelector('.delete-file-btn').addEventListener('click', async () => {
-                    if (confirm(`Wipe ${item.name} permanently?`)) {
+                    if (confirm(`Move ${item.name} to trash?`)) {
                         await deleteSandboxItem(`${currentPath}/${item.name}`);
                     }
                 });
@@ -1050,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
             if (res.ok) {
-                showNotification('Deleted item successfully from filesystem.', 'success');
+                showNotification('Item moved to trash.', 'success');
                 loadFileExplorer();
             }
         } catch (e) {
@@ -1058,6 +1135,28 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             removeTaskIndicator();
         }
+    }
+
+    const emptyTrashBtn = document.getElementById('filemanager-empty-trash-btn');
+    if (emptyTrashBtn) {
+        emptyTrashBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to empty the trash? This action is irreversible.')) return;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/filemanager/trash/empty', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(`Trash emptied. Freed ${formatBytes(data.bytes_freed)}.`, 'success');
+                }
+            } catch (e) {
+                showNotification('Error emptying trash.', 'error');
+            } finally {
+                removeTaskIndicator();
+            }
+        });
     }
 
     // Interactive File Editor
@@ -1366,24 +1465,102 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    function triggerAppInstallationAutodeploy(app, buttonElement) {
+    async function triggerAppInstallationAutodeploy(app, buttonElement) {
+        const domain = prompt(`Select target domain for ${app} installation:`, cachedDomains[0]?.domain_name);
+        if (!domain) return;
+
         let progress = 0;
         buttonElement.disabled = true;
         buttonElement.textContent = 'Installing (0%)';
-        showNotification(`Softaculous initiating autodeploy sequence for ${app}...`, 'info');
+        showNotification(`Softaculous initiating autodeploy sequence for ${app} on ${domain}...`, 'info');
 
-        const interval = setInterval(() => {
-            progress += 10;
-            buttonElement.textContent = `Installing (${progress}%)`;
-            if (progress >= 100) {
-                clearInterval(interval);
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/software/install', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ app: app, domain: domain })
+            });
+
+            if (res.ok) {
+                const interval = setInterval(() => {
+                    progress += 10;
+                    buttonElement.textContent = `Configuring (${progress}%)`;
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        buttonElement.disabled = false;
+                        buttonElement.textContent = 'Install App';
+                        showNotification(`${app} successfully provisioned on ${domain}! Database created automatically.`, 'success');
+                        loadFileExplorer();
+                    }
+                }, 300);
+            } else {
                 buttonElement.disabled = false;
                 buttonElement.textContent = 'Install App';
-                showNotification(`${app} Core Suite autodeployed successfully! Admin credentials sent to ${currentUser}@neocp.io`, 'success');
-                // Seed new files
-                loadFileExplorer();
+                showNotification('Softaculous autodeploy failed.', 'error');
             }
-        }, 600);
+        } catch (e) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = 'Install App';
+            showNotification('Softaculous API connection failure.', 'error');
+        } finally {
+            removeTaskIndicator();
+        }
+    }
+
+    const installSoftBtn = document.getElementById('install-softaculous-btn');
+    if (installSoftBtn) {
+        installSoftBtn.addEventListener('click', async () => {
+            if (!confirm('Initiate real-time installation of Softaculous Core? This downloads and executes the official setup script.')) return;
+            addTaskIndicator();
+            showNotification('Connecting to Softaculous mirrors. Downloading install.sh...', 'info');
+            try {
+                const res = await fetch('/api/software/install', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ app: 'Softaculous' })
+                });
+                if (res.ok) {
+                    showNotification('Softaculous successfully integrated into NeoCP core!', 'success');
+                } else {
+                    const err = await res.text();
+                    showNotification(`Installation failed: ${err}`, 'error');
+                }
+            } catch (e) { showNotification('API Dispatch error.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const installBackuplyBtn = document.getElementById('install-backuply-btn');
+    if (installBackuplyBtn) {
+        installBackuplyBtn.addEventListener('click', async () => {
+            if (!confirm('Deploy Backuply Enterprise? This will install the official Backuply binary and sync service.')) return;
+            addTaskIndicator();
+            showNotification('Fetching Backuply secure packages...', 'info');
+            try {
+                const res = await fetch('/api/software/install', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ app: 'Backuply' })
+                });
+                if (res.ok) {
+                    showNotification('Backuply Enterprise active and monitoring user sandboxes.', 'success');
+                } else {
+                    const err = await res.text();
+                    showNotification(`Deployment failed: ${err}`, 'error');
+                }
+            } catch (e) { showNotification('API Connection error.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
     }
 
     document.getElementById('save-php-ini-btn').addEventListener('click', () => {
@@ -1766,86 +1943,166 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('attach-node-btn').addEventListener('click', attachNode);
 
     // ==========================================================================
-    // 13. WHM RESOURCE PACKAGE PROVISIONER
+    // 12B. TRANSFER LOGS & BULK MIGRATION
+    // ==========================================================================
+    async function loadTransferLogs() {
+        const tbody = document.querySelector('#transfer-logs-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading logs...</td></tr>';
+        try {
+            const res = await fetch('/api/migrations/logs', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const logs = await res.json();
+            tbody.innerHTML = '';
+            logs.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code>${l.id}</code></td>
+                    <td><span class="status-badge ${l.status === 'completed' ? 'badge-green' : 'badge-orange'}">${l.status}</span></td>
+                    <td>${new Date(l.created_at).toLocaleString()}</td>
+                    <td><button class="action-btn-secondary view-log-details-btn" data-id="${l.id}">View Trace</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    const bulkMigBtn = document.getElementById('start-bulk-migration-btn');
+    if (bulkMigBtn) {
+        bulkMigBtn.addEventListener('click', async () => {
+            const accounts = document.getElementById('migration-bulk-list').value.split(',');
+            showNotification(`Bulk migration for ${accounts.length} accounts initiated.`, 'info');
+            // This would call a new bulk endpoint, for now we simulate the Orchestrator trigger.
+        });
+    }
+
+    // ==========================================================================
+    // 13. WHM RESOURCE PACKAGE PROVISIONER & RESELLER CENTER
     // ==========================================================================
     const createPkgBtn = document.getElementById('create-package-btn');
-    createPkgBtn.addEventListener('click', async () => {
-        const name = document.getElementById('pkg-name-input').value;
-        const disk = parseInt(document.getElementById('pkg-disk-input').value) || 0;
-        const bw = parseInt(document.getElementById('pkg-bw-input').value) || 0;
-        const domains = parseInt(document.getElementById('pkg-domains-input').value) || 0;
-        const db = parseInt(document.getElementById('pkg-db-input').value) || 0;
-        const cpu = parseInt(document.getElementById('pkg-cpu-input').value) || 0;
-        const ram = parseInt(document.getElementById('pkg-ram-input').value) || 0;
+    if (createPkgBtn) {
+        createPkgBtn.addEventListener('click', async () => {
+            const name = document.getElementById('pkg-name-input').value;
+            const disk = document.getElementById('pkg-disk-input').value;
+            const bw = document.getElementById('pkg-bw-input').value;
+            const ftp = document.getElementById('pkg-ftp-input').value;
+            const email = document.getElementById('pkg-email-input').value;
+            const db = document.getElementById('pkg-db-input').value;
+            const sub = document.getElementById('pkg-sub-input').value;
+            const parked = document.getElementById('pkg-parked-input').value;
+            const addon = document.getElementById('pkg-addon-input').value;
+            const passenger = document.getElementById('pkg-passenger-input').value;
+            const hourly = document.getElementById('pkg-hourly-email-input').value;
+            const failedPct = document.getElementById('pkg-failed-email-input').value;
+            const emailQuota = document.getElementById('pkg-email-quota-input').value;
+            const teamUsers = document.getElementById('pkg-team-users-input').value;
 
-        if (!name) {
-            showNotification('Please enter a package name.', 'error');
-            return;
-        }
+            const dedicatedIp = document.getElementById('pkg-dedicated-ip-toggle').checked;
+            const shell = document.getElementById('pkg-shell-toggle').checked;
+            const cgi = document.getElementById('pkg-cgi-toggle').checked;
+            const digestAuth = document.getElementById('pkg-digest-auth-toggle').checked;
+            const whmReseller = document.getElementById('pkg-reseller-toggle').checked;
+            const locale = document.getElementById('pkg-locale-select').value;
 
-        addTaskIndicator();
-        try {
-            const res = await fetch('/api/packages', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
-                },
-                body: JSON.stringify({
-                    name,
-                    disk_limit: disk,
-                    bandwidth_limit: bw,
-                    domains_limit: domains,
-                    databases_limit: db,
-                    lve_cpu_pct: cpu,
-                    lve_ram_mb: ram
-                })
-            });
-            if (res.ok) {
-                showNotification('WHM custom reseller subscription plan deployed.', 'success');
-                loadPackagesTable();
+            if (!name) {
+                showNotification('Please enter a package name.', 'error');
+                return;
             }
-        } catch (e) {
-            showNotification('Error creating package.', 'error');
-        } finally {
-            removeTaskIndicator();
-        }
-    });
+
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/packages/v2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({
+                        name,
+                        disk_quota: disk,
+                        bandwidth: bw,
+                        max_ftp: ftp,
+                        max_email: email,
+                        max_sql: db,
+                        max_subdomains: sub,
+                        max_parked_domains: parked,
+                        max_addon_domains: addon,
+                        max_passenger_apps: passenger,
+                        hourly_email_limit: hourly,
+                        failed_email_pct: failedPct,
+                        max_quota_per_email: emailQuota,
+                        max_team_users: teamUsers,
+                        dedicated_ip: dedicatedIp,
+                        shell_access: shell,
+                        cgi_access: cgi,
+                        digest_auth: digestAuth,
+                        whm_reseller: whmReseller,
+                        is_reseller: whmReseller, // redundant but keep for compatibility
+                        locale: locale
+                    })
+                });
+                if (res.ok) {
+                    showNotification('Production resource package deployed.', 'success');
+                    loadPackagesTable();
+                }
+            } catch (e) {
+                showNotification('Error creating package.', 'error');
+            } finally {
+                removeTaskIndicator();
+            }
+        });
+    }
 
     async function loadPackagesTable() {
         const tbody = document.querySelector('#packages-table tbody');
+        const pkgSelect = document.getElementById('new-acc-package');
         if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Loading plans...</td></tr>';
 
         try {
-            const res = await fetch('/api/packages', {
+            const res = await fetch('/api/packages/v2', {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
             const pkgs = await res.json();
+
+            if (pkgSelect) {
+                pkgSelect.innerHTML = '';
+                pkgs.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    pkgSelect.appendChild(opt);
+                });
+            }
 
             tbody.innerHTML = '';
             pkgs.forEach(pkg => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong class="text-blue">${pkg.name}</strong></td>
-                    <td>${pkg.disk_limit} MB / ${pkg.bandwidth_limit} GB</td>
-                    <td>D:${pkg.domains_limit} | DB:${pkg.databases_limit}</td>
-                    <td><span class="status-badge badge-green">${pkg.lve_cpu_pct}% CPU | ${pkg.lve_ram_mb}MB</span></td>
+                    <td>Disk: ${pkg.disk_quota}<br>BW: ${pkg.bandwidth}</td>
+                    <td>SQL: ${pkg.max_sql} | FTP: ${pkg.max_ftp}<br>Email: ${pkg.max_email}</td>
                     <td>
-                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete Plan</button>
+                        <span class="status-badge ${pkg.shell_access ? 'badge-green' : 'badge-muted'}">${pkg.shell_access ? 'Shell' : 'No Shell'}</span>
+                        <span class="status-badge ${pkg.is_reseller ? 'badge-purple' : 'badge-muted'}">${pkg.is_reseller ? 'Reseller' : 'User'}</span><br>
+                        <span class="text-muted" style="font-size: 10px;">Locale: ${pkg.locale}</span>
+                    </td>
+                    <td>
+                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                     </td>
                 `;
 
                 tr.querySelector('.delete-pkg-btn').addEventListener('click', async () => {
-                    if (confirm(`Delete resource package ${pkg.name}?`)) {
+                    if (confirm(`Delete package ${pkg.name}?`)) {
                         addTaskIndicator();
                         try {
-                            const delRes = await fetch(`/api/packages?name=${pkg.name}`, {
+                            const delRes = await fetch(`/api/packages/v2?name=${pkg.name}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
                             });
                             if (delRes.ok) {
-                                showNotification('Resource package wiped successfully.', 'success');
+                                showNotification('Package wiped.', 'success');
                                 loadPackagesTable();
                             }
                         } catch (e) {
@@ -1861,12 +2118,234 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    const transferBtn = document.getElementById('transfer-ownership-btn');
+    if (transferBtn) {
+        transferBtn.addEventListener('click', async () => {
+            const account = document.getElementById('transfer-acc-username').value;
+            const reseller = document.getElementById('transfer-reseller-owner').value;
+            if (!account || !reseller) return;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/reseller?action=transfer_ownership', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ account, reseller })
+                });
+                if (res.ok) {
+                    showNotification(`Ownership of ${account} moved to ${reseller}.`, 'success');
+                    loadResellerAccounts();
+                } else {
+                    showNotification('Transfer failed.', 'error');
+                }
+            } catch (e) { showNotification('Transfer failed.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const createAccBtn = document.getElementById('create-account-submit-btn');
+    if (createAccBtn) {
+        createAccBtn.addEventListener('click', async () => {
+            const domain = document.getElementById('new-acc-domain').value;
+            const user = document.getElementById('new-acc-user').value;
+            const pass = document.getElementById('new-acc-pass').value;
+            const email = document.getElementById('new-acc-email').value;
+            const pkg = document.getElementById('new-acc-package').value;
+            const role = document.getElementById('new-acc-role').value;
+
+            if (!user || !domain) return;
+            const isUpdate = createAccBtn.textContent === 'Update Account';
+            const action = isUpdate ? 'update_account' : 'create_account';
+
+            addTaskIndicator();
+            try {
+                const res = await fetch(`/api/reseller?action=${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({
+                        username: user,
+                        password: pass,
+                        email: email,
+                        plan: pkg,
+                        role: role,
+                        ip_address: domain
+                    })
+                });
+                if (res.ok) {
+                    showNotification(`Account ${user} ${isUpdate ? 'updated' : 'created'} successfully.`, 'success');
+                    loadResellerAccounts();
+                    createAccBtn.textContent = 'Create Account';
+                    // clear fields
+                    document.getElementById('new-acc-domain').value = '';
+                    document.getElementById('new-acc-user').value = '';
+                    document.getElementById('new-acc-pass').value = '';
+                    document.getElementById('new-acc-email').value = '';
+                } else {
+                    showNotification(`${isUpdate ? 'Update' : 'Creation'} failed.`, 'error');
+                }
+            } catch (e) { showNotification('API Error.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const delegateIPBtn = document.getElementById('delegate-ip-btn');
+    if (delegateIPBtn) {
+        delegateIPBtn.addEventListener('click', async () => {
+            const reseller = document.getElementById('delegate-reseller-user').value;
+            const ip = document.getElementById('delegate-ip-addr').value;
+            if (!reseller || !ip) return;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/reseller?action=delegate_ip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ reseller, ip })
+                });
+                if (res.ok) {
+                    showNotification(`IP ${ip} delegated to ${reseller}.`, 'success');
+                    loadResellerAccounts();
+                } else {
+                    showNotification('Delegation failed.', 'error');
+                }
+            } catch (e) { showNotification('Delegation failed.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    async function loadResellerAccounts() {
+        const tbody = document.getElementById('reseller-accounts-body');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading account topology...</td></tr>';
+        try {
+            const res = await fetch('/api/reseller', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const accounts = await res.json();
+            tbody.innerHTML = '';
+            accounts.forEach(acc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <strong>${acc.username}</strong><br>
+                        <span class="text-muted" style="font-size: 0.7rem;">${acc.email}</span>
+                    </td>
+                    <td><span class="status-badge ${acc.owner === 'admin' ? 'badge-red' : 'badge-purple'}">${acc.owner}</span></td>
+                    <td>${acc.plan}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="action-btn-secondary manage-user-files-btn" data-user="${acc.username}" style="padding: 2px 6px; font-size: 0.75rem;">Files</button>
+                            <button class="action-btn-secondary edit-acc-btn" data-user="${acc.username}" style="padding: 2px 6px; font-size: 0.75rem;">Edit</button>
+                            <button class="action-btn-secondary edit-acc-owner-btn" data-user="${acc.username}" style="padding: 2px 6px; font-size: 0.75rem;">Owner</button>
+                            <button class="action-btn-secondary terminate-acc-btn text-red" data-user="${acc.username}" style="padding: 2px 6px; font-size: 0.75rem;">Terminate</button>
+                        </div>
+                    </td>
+                `;
+                tr.querySelector('.manage-user-files-btn').addEventListener('click', () => {
+                    currentPath = `/home/${acc.username}`;
+                    switchToView('filemanager');
+                    showNotification(`Browsing filesystem for user: ${acc.username}`, 'info');
+                });
+                tr.querySelector('.edit-acc-btn').addEventListener('click', () => {
+                    // Quick populate create form for "Edit" simulation/replacement
+                    document.getElementById('new-acc-user').value = acc.username;
+                    document.getElementById('new-acc-email').value = acc.email;
+                    document.getElementById('new-acc-package').value = acc.plan;
+                    document.getElementById('new-acc-role').value = acc.role;
+                    document.getElementById('create-account-submit-btn').textContent = 'Update Account';
+                    showNotification(`Populated form to edit ${acc.username}`, 'info');
+                });
+                tr.querySelector('.edit-acc-owner-btn').addEventListener('click', () => {
+                    document.getElementById('transfer-acc-username').value = acc.username;
+                    document.getElementById('transfer-reseller-owner').value = acc.owner;
+                });
+                tr.querySelector('.terminate-acc-btn').addEventListener('click', async () => {
+                    if (confirm(`Are you absolutely sure you want to TERMINATE the account ${acc.username}? This wipes all files and databases.`)) {
+                        addTaskIndicator();
+                        try {
+                            const res = await fetch(`/api/reseller?action=terminate_account&username=${acc.username}`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                            });
+                            if (res.ok) {
+                                showNotification(`Account ${acc.username} terminated and purged.`, 'success');
+                                loadResellerAccounts();
+                            }
+                        } catch (e) { showNotification('Termination failed.', 'error'); }
+                        finally { removeTaskIndicator(); }
+                    }
+                });
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-red">Failed to load accounts.</td></tr>';
+        }
+    }
+
     // ==========================================================================
     // 14. DYNAMIC CRON JOBS MANAGER (cPanel Mapped)
     // ==========================================================================
     async function loadCronJobs() {
-        // Mapped automatically
-        console.log('Cron tasks queried.');
+        const tbody = document.querySelector('#cron-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading cron tab...</td></tr>';
+        try {
+            const res = await fetch('/api/cron', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const jobs = await res.json();
+            tbody.innerHTML = '';
+            jobs.forEach(j => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${j.task_name}</strong></td>
+                    <td><code>${j.schedule}</code></td>
+                    <td style="font-family:var(--font-mono); font-size:0.8rem;">${j.command}</td>
+                    <td>${j.owner}</td>
+                    <td><span class="status-badge ${j.active ? 'badge-green' : 'badge-red'}">${j.active ? 'Active' : 'Disabled'}</span></td>
+                    <td>
+                        <button class="action-btn-secondary delete-cron-btn text-red" data-id="${j.id}" style="padding: 2px 6px; font-size: 0.75rem;">Delete</button>
+                    </td>
+                `;
+                tr.querySelector('.delete-cron-btn').addEventListener('click', async () => {
+                    if (confirm('Delete this cron job?')) {
+                        await fetch(`/api/cron?id=${j.id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                        });
+                        loadCronJobs();
+                    }
+                });
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    const addCronBtn = document.getElementById('open-add-cron-btn');
+    if (addCronBtn) {
+        addCronBtn.addEventListener('click', async () => {
+            const name = prompt('Task Name:');
+            const schedule = prompt('Schedule (e.g. * * * * *):');
+            const command = prompt('Command:');
+            if (!name || !schedule || !command) return;
+
+            await fetch('/api/cron', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_name: name, schedule, command, active: true })
+            });
+            loadCronJobs();
+        });
     }
 
     // ==========================================================================
@@ -2983,6 +3462,98 @@ document.addEventListener('DOMContentLoaded', () => {
     const wafCsrfTog = document.getElementById('waf-csrf-toggle');
     if (wafCsrfTog) {
         wafCsrfTog.addEventListener('change', (e) => updateWAFBadgeState('csrf', e.target.checked));
+    }
+
+    // ==========================================================================
+    // 20C. SERVER IDENTITY CONTROLLERS
+    // ==========================================================================
+    const saveHostnameBtn = document.getElementById('save-hostname-btn');
+    if (saveHostnameBtn) {
+        saveHostnameBtn.addEventListener('click', async () => {
+            const hostname = document.getElementById('server-hostname-input').value;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/server/identity?action=set_hostname', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ hostname })
+                });
+                if (res.ok) {
+                    showNotification('Server hostname updated.', 'success');
+                } else {
+                    showNotification('Failed to update hostname.', 'error');
+                }
+            } catch (e) { showNotification('Failed to update hostname.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const saveResolversBtn = document.getElementById('save-resolvers-btn');
+    if (saveResolversBtn) {
+        saveResolversBtn.addEventListener('click', async () => {
+            const primary = document.getElementById('resolver-primary').value;
+            const secondary = document.getElementById('resolver-secondary').value;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/server/identity?action=update_resolvers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ primary, secondary })
+                });
+                if (res.ok) {
+                    showNotification('DNS resolvers updated.', 'success');
+                } else {
+                    showNotification('Failed to update resolvers.', 'error');
+                }
+            } catch (e) { showNotification('Failed to update resolvers.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    const assignIPBtn = document.getElementById('assign-ip-btn');
+    if (assignIPBtn) {
+        assignIPBtn.addEventListener('click', async () => {
+            const ip = document.getElementById('new-ip-addr').value;
+            const subnet = document.getElementById('new-ip-subnet').value;
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/server/identity?action=assign_ip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ ip, subnet })
+                });
+                if (res.ok) {
+                    showNotification(`IP ${ip} bound to interface.`, 'success');
+                    loadServerIdentity();
+                } else {
+                    showNotification('Failed to assign IP.', 'error');
+                }
+            } catch (e) { showNotification('Failed to assign IP.', 'error'); }
+            finally { removeTaskIndicator(); }
+        });
+    }
+
+    async function loadServerIdentity() {
+        try {
+            const res = await fetch('/api/server/identity', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const settings = await res.json();
+            document.getElementById('server-hostname-input').value = settings.hostname;
+            document.getElementById('resolver-primary').value = settings.primary_dns;
+            document.getElementById('resolver-secondary').value = settings.secondary_dns;
+        } catch (e) {
+            console.error('Failed to load server identity.', e);
+        }
     }
 
     // ==========================================================================

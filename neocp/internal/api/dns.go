@@ -111,7 +111,18 @@ func HandleDNSRecords(w http.ResponseWriter, r *http.Request) {
 
 		// Recompile BIND9 zone file
 		records, _ := db.GetDNSRecords(req.DomainName)
-		_, _ = oslayer.GenerateBind9ZoneFile(req.DomainName, records, workspaceDir)
+		var osRecords []oslayer.DNSRecord
+		for _, r := range records {
+			osRecords = append(osRecords, oslayer.DNSRecord{
+				ID:       r.ID,
+				Type:     r.Type,
+				Name:     r.Name,
+				Value:    r.Value,
+				TTL:      r.TTL,
+				Priority: r.Priority,
+			})
+		}
+		_, _ = oslayer.GenerateBind9ZoneFile(req.DomainName, osRecords, workspaceDir)
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(req.Record)
@@ -153,7 +164,18 @@ func HandleDNSRecords(w http.ResponseWriter, r *http.Request) {
 
 		// Recompile BIND9 zone file
 		records, _ := db.GetDNSRecords(req.DomainName)
-		_, _ = oslayer.GenerateBind9ZoneFile(req.DomainName, records, workspaceDir)
+		var osRecords []oslayer.DNSRecord
+		for _, r := range records {
+			osRecords = append(osRecords, oslayer.DNSRecord{
+				ID:       r.ID,
+				Type:     r.Type,
+				Name:     r.Name,
+				Value:    r.Value,
+				TTL:      r.TTL,
+				Priority: r.Priority,
+			})
+		}
+		_, _ = oslayer.GenerateBind9ZoneFile(req.DomainName, osRecords, workspaceDir)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"success":true}`))

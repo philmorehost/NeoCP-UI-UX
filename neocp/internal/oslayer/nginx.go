@@ -6,12 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"neocp/internal/core"
 )
 
-// GenerateNginxConfig builds a fully functional Nginx Virtual Host config file 
-func GenerateNginxConfig(domainName string, owner string, phpVersion string, gzipEnabled bool, brotliEnabled bool, sslActive bool, workspaceDir string) (string, error) {
+type WAFPolicy struct {
+	SQLiShield bool `json:"sqli_shield"`
+	XSSBlock   bool `json:"xss_block"`
+	LFIShield  bool `json:"lfi_shield"`
+	CSRFHeader bool `json:"csrf_header"`
+}
+
+// GenerateNginxConfig builds a fully functional Nginx Virtual Host config file
+func GenerateNginxConfig(domainName string, owner string, phpVersion string, gzipEnabled bool, brotliEnabled bool, sslActive bool, waf WAFPolicy, workspaceDir string) (string, error) {
 	nginxVHostsDir := filepath.Join(workspaceDir, "nginx_vhosts")
 	err := os.MkdirAll(nginxVHostsDir, 0755)
 	if err != nil {
@@ -45,17 +50,6 @@ func GenerateNginxConfig(domainName string, owner string, phpVersion string, gzi
     ssl_certificate_key %s/key.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;`, filepath.ToSlash(workspaceDir), filepath.ToSlash(workspaceDir))
-	}
-
-	// Fetch WAF Policy from database
-	db := core.GetDB()
-	doms := db.GetDomains(owner, true)
-	var waf core.WAFPolicy
-	for _, d := range doms {
-		if d.DomainName == domainName {
-			waf = d.WAFPolicy
-			break
-		}
 	}
 
 	var wafLines []string

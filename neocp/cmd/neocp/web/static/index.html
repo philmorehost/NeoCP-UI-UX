@@ -80,6 +80,9 @@
                     <li class="menu-item" data-target="filemanager">
                         <span class="item-icon">📁</span> File Explorer
                     </li>
+                    <li class="menu-item" data-target="cron">
+                        <span class="item-icon">⏰</span> Cron Jobs
+                    </li>
                     <li class="menu-item" data-target="databases">
                         <span class="item-icon">🗄️</span> Databases Core
                     </li>
@@ -106,6 +109,9 @@
 
                 <div class="menu-section">Enterprise Ecosystem</div>
                 <ul class="menu-list">
+                    <li class="menu-item admin-only" data-target="server-identity">
+                        <span class="item-icon">⚙️</span> Server Identity
+                    </li>
                     <li class="menu-item" data-target="migration">
                         <span class="item-icon">🚀</span> UZME Migration Engine
                     </li>
@@ -450,13 +456,14 @@
                     <div class="view-header-bar">
                         <h3>Interactive Web File Explorer</h3>
                         <div class="header-button-group">
+                            <button class="action-btn-secondary" id="filemanager-empty-trash-btn">🗑️ Empty Trash</button>
                             <button class="action-btn-secondary" id="filemanager-newfile-btn">+ New File</button>
                             <button class="action-btn-secondary" id="filemanager-newdir-btn">+ New Folder</button>
                             <button class="action-btn" id="filemanager-webdav-btn">WebDAV: Off</button>
                         </div>
                     </div>
 
-                    <div class="filemanager-grid">
+                    <div class="filemanager-grid" id="filemanager-drop-zone">
                         <!-- Directory Tree Pane -->
                         <aside class="filemanager-sidebar glass">
                             <h4>Directory Tree</h4>
@@ -961,47 +968,88 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <!-- VIEW 10: RESELLER MASTER -->
                 <div class="viewport-view" id="view-reseller">
                     <div class="view-header-bar">
-                        <h3>WHM Master Reseller & WHMCS Sync Manager</h3>
+                        <h3>WHM Master Reseller & Reseller Center</h3>
                     </div>
 
                     <div class="reseller-grid">
+                        <div class="split-card glass">
+                            <h4>Reseller Center</h4>
+                            <p class="meta-desc">Manage resellers, change ownership, and delegate IP addresses.</p>
+
+                            <h5 style="margin-top: 15px;">Account Ownership Transfer</h5>
+                            <div class="input-group">
+                                <label>Target Account Username</label>
+                                <input type="text" id="transfer-acc-username" placeholder="e.g. user123">
+                            </div>
+                            <div class="input-group">
+                                <label>New Reseller Owner</label>
+                                <input type="text" id="transfer-reseller-owner" placeholder="e.g. reseller1">
+                            </div>
+                            <button class="action-btn" id="transfer-ownership-btn">Transfer Ownership</button>
+
+                            <h5 style="margin-top: 25px;">IP Delegation</h5>
+                            <div class="input-group">
+                                <label>Reseller Username</label>
+                                <input type="text" id="delegate-reseller-user" placeholder="e.g. reseller1">
+                            </div>
+                            <div class="input-group">
+                                <label>IP Address to Delegate</label>
+                                <input type="text" id="delegate-ip-addr" placeholder="e.g. 192.168.1.50">
+                            </div>
+                            <button class="action-btn-secondary" id="delegate-ip-btn">Delegate Dedicated IP</button>
+                        </div>
+
                         <div class="split-card glass">
                             <h4>WHM Resource Package Provisioner</h4>
                             <p class="meta-desc">Design customized subscription plans for your resellers and sub-users.</p>
 
                             <div class="input-group">
-                                <label>Package Package Name</label>
+                                <label>Package Name</label>
                                 <input type="text" id="pkg-name-input" placeholder="e.g. Silver-Pack">
                             </div>
                             <div class="ini-grid">
                                 <div class="input-group">
-                                    <label>Disk Capacity Limit (MB)</label>
-                                    <input type="number" id="pkg-disk-input" value="5000">
+                                    <label>Disk Quota (e.g. 10GB, unlimited)</label>
+                                    <input type="text" id="pkg-disk-input" value="10GB">
                                 </div>
                                 <div class="input-group">
-                                    <label>Bandwidth Limit (GB)</label>
-                                    <input type="number" id="pkg-bw-input" value="100">
+                                    <label>Bandwidth (e.g. 1TB, unlimited)</label>
+                                    <input type="text" id="pkg-bw-input" value="1TB">
                                 </div>
                                 <div class="input-group">
-                                    <label>Max Domains</label>
-                                    <input type="number" id="pkg-domains-input" value="10">
-                                </div>
-                                <div class="input-group">
-                                    <label>Max Databases</label>
+                                    <label>Max SQL</label>
                                     <input type="number" id="pkg-db-input" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Max FTP</label>
+                                    <input type="number" id="pkg-ftp-input" value="10">
+                                </div>
+                            </div>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Max Email</label>
+                                    <input type="number" id="pkg-email-input" value="50">
+                                </div>
+                                <div class="input-group">
+                                    <label>Hourly Email Limit</label>
+                                    <input type="number" id="pkg-hourly-email-input" value="100">
                                 </div>
                             </div>
 
-                            <h5 style="margin-top: 20px;">LVE / Cgroups Resource Throttling</h5>
-                            <div class="ini-grid">
-                                <div class="input-group">
-                                    <label>CPU Limit Allocation (%)</label>
-                                    <input type="number" id="pkg-cpu-input" value="50">
-                                </div>
-                                <div class="input-group">
-                                    <label>Memory (RAM) Limit (MB)</label>
-                                    <input type="number" id="pkg-ram-input" value="1024">
-                                </div>
+                            <h5 style="margin-top: 20px;">Toggles & Locales</h5>
+                            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                                <label><input type="checkbox" id="pkg-shell-toggle"> Shell Access</label>
+                                <label><input type="checkbox" id="pkg-cgi-toggle"> CGI Access</label>
+                                <label><input type="checkbox" id="pkg-reseller-toggle"> Reseller Privs</label>
+                            </div>
+                            <div class="input-group">
+                                <label>Default Locale</label>
+                                <select id="pkg-locale-select" class="role-selector">
+                                    <option value="en">English (Default)</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                </select>
                             </div>
                             <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy WHM Package</button>
                         </div>
@@ -1175,6 +1223,72 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <button class="action-btn-secondary install-docker-template-btn" data-image="postgres:alpine" data-name="postgres-db" data-ports="5432:5432" style="padding: 6px 12px; margin: 0; width: auto;">Run Stack</button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: CRON JOBS -->
+                <div class="viewport-view" id="view-cron">
+                    <div class="view-header-bar">
+                        <h3>Task Scheduler & Cron Jobs</h3>
+                        <button class="action-btn" id="open-add-cron-btn">+ Add New Cron Job</button>
+                    </div>
+                    <div class="split-card glass">
+                        <h4>Scheduled System Tasks</h4>
+                        <table class="neocp-data-table" id="cron-table">
+                            <thead>
+                                <tr>
+                                    <th>Task Name</th>
+                                    <th>Schedule</th>
+                                    <th>Command</th>
+                                    <th>Owner</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW: SERVER IDENTITY -->
+                <div class="viewport-view" id="view-server-identity">
+                    <div class="view-header-bar">
+                        <h3>Server Identity & Network Configuration</h3>
+                    </div>
+                    <div class="security-grid">
+                        <div class="split-card glass">
+                            <h4>Hostname & Resolvers</h4>
+                            <div class="input-group">
+                                <label>System Hostname</label>
+                                <input type="text" id="server-hostname-input" value="neocp.master.node">
+                                <button class="action-btn" style="margin-top: 10px;" id="save-hostname-btn">Update Hostname</button>
+                            </div>
+                            <h5 style="margin-top: 25px;">DNS Resolvers (/etc/resolv.conf)</h5>
+                            <div class="input-group">
+                                <label>Primary Resolver</label>
+                                <input type="text" id="resolver-primary" value="8.8.8.8">
+                            </div>
+                            <div class="input-group">
+                                <label>Secondary Resolver</label>
+                                <input type="text" id="resolver-secondary" value="1.1.1.1">
+                            </div>
+                            <button class="action-btn-secondary" id="save-resolvers-btn">Save Resolvers</button>
+                        </div>
+                        <div class="split-card glass">
+                            <h4>Network Interfaces & IP Routing</h4>
+                            <p class="meta-desc">Bind additional IPv4 addresses to server adapters.</p>
+                            <div class="input-group">
+                                <label>New IPv4 Address</label>
+                                <input type="text" id="new-ip-addr" placeholder="e.g. 192.168.1.51">
+                            </div>
+                            <div class="input-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="new-ip-subnet" value="255.255.255.0">
+                            </div>
+                            <button class="action-btn" id="assign-ip-btn">Assign IP to Interface</button>
                         </div>
                     </div>
                 </div>

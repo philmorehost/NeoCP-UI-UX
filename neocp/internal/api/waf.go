@@ -62,6 +62,12 @@ func HandleDomainWAF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Regenerate Nginx configuration incorporating WAF rules
+	waf := oslayer.WAFPolicy{
+		SQLiShield: req.WAFPolicy.SQLiShield,
+		XSSBlock:   req.WAFPolicy.XSSBlock,
+		LFIShield:  req.WAFPolicy.LFIShield,
+		CSRFHeader: req.WAFPolicy.CSRFHeader,
+	}
 	_, err = oslayer.GenerateNginxConfig(
 		targetDomain.DomainName,
 		targetDomain.Owner,
@@ -69,6 +75,7 @@ func HandleDomainWAF(w http.ResponseWriter, r *http.Request) {
 		targetDomain.GzipEnabled,
 		targetDomain.BrotliEnabled,
 		targetDomain.SSLActive,
+		waf,
 		workspaceDir,
 	)
 	if err == nil {

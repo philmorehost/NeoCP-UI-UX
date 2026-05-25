@@ -8,7 +8,7 @@
       "plan": "Unlimited System Plan",
       "ip_address": "",
       "email": "admin@neocp.io",
-      "disk_used": 1,
+      "disk_used": 1024,
       "disk_limit": 0,
       "bandwidth_used": 45,
       "bandwidth_limit": 0,
@@ -17,13 +17,7 @@
       "shell_access": false,
       "cgi_enabled": false,
       "locale": "",
-      "is_suspended": false,
-      "dedicated_ip": "",
-      "shared_ip": "",
-      "delegated_ips": null,
-      "nameservers": null,
-      "privileges": null,
-      "created_at": "2026-05-22T07:52:55.846995806Z"
+      "created_at": "2026-05-22T07:58:07.542832703Z"
     },
     "patel": {
       "username": "patel",
@@ -42,13 +36,7 @@
       "shell_access": false,
       "cgi_enabled": false,
       "locale": "",
-      "is_suspended": false,
-      "dedicated_ip": "",
-      "shared_ip": "",
-      "delegated_ips": null,
-      "nameservers": null,
-      "privileges": null,
-      "created_at": "2026-05-22T07:52:55.846997273Z"
+      "created_at": "2026-05-22T07:58:07.542834506Z"
     },
     "reseller1": {
       "username": "reseller1",
@@ -67,13 +55,7 @@
       "shell_access": false,
       "cgi_enabled": false,
       "locale": "",
-      "is_suspended": false,
-      "dedicated_ip": "",
-      "shared_ip": "",
-      "delegated_ips": null,
-      "nameservers": null,
-      "privileges": null,
-      "created_at": "2026-05-22T07:52:55.846996799Z"
+      "created_at": "2026-05-22T07:58:07.542834014Z"
     }
   },
   "domains": {
@@ -87,7 +69,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-06T07:52:55.846997516Z",
+      "ssl_expires": "2026-08-06T07:58:07.542834656Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -100,7 +82,7 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-04-22T07:52:55.846998698Z"
+      "created_at": "2026-04-22T07:58:07.542835765Z"
     },
     "shop.digitalneo.net": {
       "domain_name": "shop.digitalneo.net",
@@ -112,7 +94,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-07-20T07:52:55.846999133Z",
+      "ssl_expires": "2026-07-20T07:58:07.54283716Z",
       "webdav_enabled": true,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -125,7 +107,7 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-12T07:52:55.846999277Z"
+      "created_at": "2026-05-12T07:58:07.542837268Z"
     }
   },
   "databases": {
@@ -135,7 +117,7 @@
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-22T07:52:55.847000313Z"
+      "created_at": "2026-05-22T07:58:07.542838451Z"
     }
   },
   "cron_jobs": {
@@ -146,16 +128,7 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-22T07:52:55.847010496Z"
-    },
-    "cron_72985": {
-      "id": "cron_72985",
-      "owner": "",
-      "task_name": "Test Cron",
-      "command": "echo 'hello'",
-      "schedule": "* * * * *",
-      "active": true,
-      "created_at": "2026-05-22T07:52:55.850535831Z"
+      "created_at": "2026-05-22T07:58:07.54287409Z"
     },
     "sys_file_scan": {
       "id": "sys_file_scan",
@@ -164,7 +137,7 @@
       "command": "/usr/local/neocp/bin/filecheck",
       "schedule": "@daily",
       "active": true,
-      "created_at": "2026-05-22T07:52:55.847011184Z"
+      "created_at": "2026-05-22T07:58:07.542901724Z"
     },
     "sys_scan_1": {
       "id": "sys_scan_1",
@@ -173,7 +146,7 @@
       "command": "/usr/local/neocp/bin/scan --all",
       "schedule": "0 0 * * 0",
       "active": true,
-      "created_at": "2026-05-22T07:52:55.847010969Z"
+      "created_at": "2026-05-22T07:58:07.542901504Z"
     }
   },
   "reseller_packages": {
@@ -185,7 +158,7 @@
       "databases_limit": 250,
       "lve_cpu_pct": 100,
       "lve_ram_mb": 2048,
-      "created_at": "2026-05-22T07:52:55.847000092Z"
+      "created_at": "2026-05-22T07:58:07.542838255Z"
     },
     "Premium-Personal": {
       "name": "Premium-Personal",
@@ -195,35 +168,10 @@
       "databases_limit": 5,
       "lve_cpu_pct": 50,
       "lve_ram_mb": 512,
-      "created_at": "2026-05-22T07:52:55.846999672Z"
+      "created_at": "2026-05-22T07:58:07.542837473Z"
     }
   },
-  "packages": {
-    "V6-Gold-Plan": {
-      "name": "V6-Gold-Plan",
-      "disk_quota": "20GB",
-      "bandwidth": "unlimited",
-      "max_sql": "50",
-      "max_ftp": "20",
-      "max_email": "100",
-      "max_subdomains": "",
-      "max_parked_domains": "",
-      "max_addon_domains": "",
-      "max_passenger_apps": "",
-      "max_team_users": "",
-      "hourly_email_limit": "",
-      "failed_email_pct": "",
-      "max_quota_per_email": "",
-      "is_reseller": false,
-      "dedicated_ip": false,
-      "shell_access": true,
-      "cgi_access": false,
-      "digest_auth": false,
-      "whm_reseller": false,
-      "locale": "en",
-      "created_at": "2026-05-22T07:52:55.854353628Z"
-    }
-  },
+  "packages": {},
   "tickets": {
     "t_101": {
       "id": "t_101",
@@ -235,27 +183,19 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-22T05:52:55.847011339Z"
+          "timestamp": "2026-05-22T05:58:07.542901966Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-22T06:52:55.847011629Z"
+          "timestamp": "2026-05-22T06:58:07.542902186Z"
         }
       ],
-      "created_at": "2026-05-22T05:52:55.847011726Z"
+      "created_at": "2026-05-22T05:58:07.542902268Z"
     }
   },
   "docker_containers": {},
   "migration_tasks": {},
   "firewall_blocks": {},
-  "cluster_nodes": {},
-  "transfer_logs": null,
-  "settings": {
-    "hostname": "",
-    "primary_dns": "",
-    "secondary_dns": "",
-    "shared_ipv4": "",
-    "available_ips": null
-  }
+  "cluster_nodes": {}
 }
