@@ -29,13 +29,13 @@ def restart_server():
     print("[TEST] Restarting NeoCP server daemon...")
     # Kill any existing running server
     if os.name == 'nt':
-        os.system("taskkill /f /im neocp.exe >nul 2>&1")
+        os.system("taskkill /f /im neocp >nul 2>&1")
     else:
-        os.system("pkill -f neocp.exe > /dev/null 2>&1")
+        os.system("pkill -f neocp > /dev/null 2>&1")
     time.sleep(1.0)
 
     # Start the server in the background
-    exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "neocp.exe")
+    exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "neocp")
     try:
         subprocess.Popen(
             [exe_path],
@@ -46,7 +46,7 @@ def restart_server():
         print("[TEST] Server daemon spawned in the background.")
         time.sleep(2.0) # wait for binding
     except Exception as e:
-        print(f"[ERROR] Failed to spawn neocp.exe: {e}")
+        print(f"[ERROR] Failed to spawn neocp: {e}")
         sys.exit(1)
 
 def test_cluster_attachment(token):
@@ -150,7 +150,7 @@ def test_staging_replication(token):
     stage_subdomain = "blog-stage.digitalneo.net"
 
     # 1. Create a dummy WordPress-like config file with serialized data
-    # Ensure absolute path relative to where neocp.exe is running
+    # Ensure absolute path relative to where neocp is running
     base_dir = os.path.dirname(os.path.abspath(__file__))
     sandbox_path = os.path.join(base_dir, "sandbox", owner, "public_html", prod_domain)
     # Ensure production domain exists in the DB first (it's seeded, but let's be sure)
@@ -257,6 +257,6 @@ if __name__ == "__main__":
 
     # Tear down
     print("\n[TEST] Tearing down background server process...")
-    os.system("taskkill /f /im neocp.exe >nul 2>&1")
+    os.system("taskkill /f /im neocp >nul 2>&1")
 
     print("\n[SUCCESS] ALL STAGE 5 DISTRIBUTED CLUSTERING & STAGING TESTS PASSED FLAWLESSLY!")

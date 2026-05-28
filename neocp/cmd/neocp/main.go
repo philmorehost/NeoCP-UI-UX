@@ -32,6 +32,7 @@ import (
 	"neocp/internal/api/public"
 	"neocp/internal/core/uzme"
 	"neocp/internal/oslayer"
+	v1 "neocp/internal/api/v1"
 )
 
 
@@ -197,6 +198,9 @@ func main() {
 	mux.Handle("/api/staging", api.RequireRole("customer", "reseller", "admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.HandleStaging(w, r, sandboxDir)
 	})))
+
+	// Public API v1 Routes
+	v1.RegisterV1Routes(mux)
 
 	// Public Provisioning API (OpenAPI 3.0)
 	mux.HandleFunc("/api/v1/swagger.json", public.SwaggerSpec)

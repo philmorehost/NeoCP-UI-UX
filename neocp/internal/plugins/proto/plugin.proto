@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package neocp.plugins;
+
+option go_package = "neocp/internal/plugins/proto";
+
+service NeoCPPlugin {
+    rpc OnAccountCreate (AccountEvent) returns (Empty) {}
+    rpc OnDomainDelete (DomainEvent) returns (Empty) {}
+    rpc RenderCustomUI (UIPayload) returns (UIResult) {}
+}
+
+message AccountEvent {
+    string username = 1;
+    string plan = 2;
+}
+
+message DomainEvent {
+    string domain_name = 1;
+    string owner = 2;
+}
+
+message UIPayload {
+    string view_id = 1;
+    string current_user = 2;
+}
+
+message UIResult {
+    string html_fragment = 1;
+}
+
+message Empty {}

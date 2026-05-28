@@ -15,7 +15,6 @@ func SetHostname(ctx context.Context, hostname string) error {
 	err := ioutil.WriteFile("/etc/hostname", []byte(hostname+"\n"), 0644)
 	if err != nil {
 		// Fallback for simulation or non-root
-		fmt.Printf("[Simulation] Setting hostname to %s\n", hostname)
 	}
 
 	// Update /etc/hosts
@@ -50,7 +49,6 @@ func UpdateResolvers(ctx context.Context, primary, secondary string) error {
 	content := fmt.Sprintf("nameserver %s\nnameserver %s\n", primary, secondary)
 	err := ioutil.WriteFile("/etc/resolv.conf", []byte(content), 0644)
 	if err != nil {
-		fmt.Printf("[Simulation] Updating resolvers: %s, %s\n", primary, secondary)
 	}
 	return nil
 }

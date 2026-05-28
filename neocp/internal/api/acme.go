@@ -35,11 +35,9 @@ func (c *ACMEClient) ProvisionCertificate(domainName string, owner string, isSim
 	logs = append(logs, fmt.Sprintf("[ACME] Triggering Let's Encrypt HTTP-01 challenge sequence for %s...", domainName))
 
 	// 1. Establish account keys
-	time.Sleep(300 * time.Millisecond)
 	logs = append(logs, "[ACME] Generating private key and registering with Let's Encrypt directory...")
 
 	// 2. Write the verification challenge token to user webroot public_html
-	time.Sleep(300 * time.Millisecond)
 	challengeDir := filepath.Join(c.SandboxDir, owner, "public_html", domainName, ".well-known", "acme-challenge")
 	err := os.MkdirAll(challengeDir, 0755)
 	if err != nil {
@@ -55,15 +53,12 @@ func (c *ACMEClient) ProvisionCertificate(domainName string, owner string, isSim
 	logs = append(logs, fmt.Sprintf("[ACME] Challenge token written to: %s", tokenFile))
 
 	// 3. Initiate Verification sequence
-	time.Sleep(500 * time.Millisecond)
 	logs = append(logs, fmt.Sprintf("[ACME] Remote directory testing http://%s/.well-known/acme-challenge/verify...", domainName))
 	
 	// Simulate HTTP-01 check
-	time.Sleep(600 * time.Millisecond)
 	logs = append(logs, "[ACME] Challenge verified successfully! Token matches CA hash.")
 
 	// 4. Generate Certificate Pair
-	time.Sleep(400 * time.Millisecond)
 	logs = append(logs, "[ACME] Finalizing certificate order, compiling RSA/ECDSA cert pair...")
 
 	// Generate and save a certificate specific for this virtual host

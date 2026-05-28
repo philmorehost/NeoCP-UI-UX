@@ -23,11 +23,11 @@ func DeployFromGit(ctx context.Context, domainName string, config core.GitConfig
 
 	// 2. Execute Clone/Pull
 	// git clone [url] [path] or cd [path] && git pull
-	// Simulation:
 	args := []string{"clone", "--depth", "1", "-b", config.Branch, config.RepoURL, targetPath}
 	_, err := exec.Execute(ctx, "git", args, 60*time.Second)
 	if err != nil {
-		log.Printf("[GitOps] Git command failed: %v. Simulating success for dev environment.", err)
+		log.Printf("[GitOps] Git command failed: %v. Ensure git is installed and SSH keys are configured.", err)
+		return err
 	}
 
 	// 3. Post-deploy hooks (e.g. npm install, composer install)

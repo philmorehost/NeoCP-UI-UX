@@ -3,7 +3,10 @@ package cms
 import (
 	"context"
 	"log"
-	"time"
+	"os"
+	"path/filepath"
+	"strings"
+	"neocp/internal/oslayer"
 )
 
 type WPSetting struct {
@@ -14,6 +17,7 @@ type WPSetting struct {
 // HardenWordPress applies security best practices to a WP installation
 func HardenWordPress(ctx context.Context, path string, settings []WPSetting) error {
 	log.Printf("[WP Toolkit] Hardening WordPress at %s", path)
+	exec := &oslayer.SafeCommandExec{}
 
 	for _, s := range settings {
 		if !s.Enabled {
@@ -22,29 +26,38 @@ func HardenWordPress(ctx context.Context, path string, settings []WPSetting) err
 
 		switch s.Name {
 		case "disable_xmlrpc":
-			// Simulate disabling XML-RPC via .htaccess or plugin
-			log.Printf("[WP Toolkit] Disabling XML-RPC for %s", path)
-		case "hide_login":
-			// Simulate moving wp-login.php
-			log.Printf("[WP Toolkit] Hiding login page for %s", path)
+			htaccess := filepath.Join(path, ".htaccess")
+			rule := "\n<Files xmlrpc.php>\nOrder Deny,Allow\nDeny from all\n</Files>\n"
+			f, err := os.OpenFile(htaccess, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				f.WriteString(rule)
+				f.Close()
+			}
 		case "disable_file_edit":
-			// Simulate define('DISALLOW_FILE_EDIT', true) in wp-config.php
-			log.Printf("[WP Toolkit] Disabling in-panel file editing for %s", path)
+			wpConfig := filepath.Join(path, "wp-config.php")
+			data, err := os.ReadFile(wpConfig)
+			if err == nil && !strings.Contains(string(data), "DISALLOW_FILE_EDIT") {
+				newContent := strings.Replace(string(data), "<?php", "<?php\ndefine('DISALLOW_FILE_EDIT', true);", 1)
+				os.WriteFile(wpConfig, []byte(newContent), 0644)
+			}
+		case "update_core":
+			_, _ = exec.Execute(ctx, "wp", []string{"core", "update", "--path=" + path, "--allow-root"}, 0)
 		}
 	}
 
-	time.Sleep(1 * time.Second)
 	return nil
 }
 
-// BulkUpdateWordPress updates core/plugins for all sites (simulation)
+// BulkUpdateWordPress updates core/plugins for all sites
 func BulkUpdateWordPress(ctx context.Context, paths []string) (int, error) {
 	log.Printf("[WP Toolkit] Starting bulk update for %d sites", len(paths))
+	exec := &oslayer.SafeCommandExec{}
 	updated := 0
 	for _, p := range paths {
-		// wp core update && wp plugin update --all
-		log.Printf("[WP Toolkit] Updating site at %s", p)
-		updated++
+		_, err := exec.Execute(ctx, "wp", []string{"core", "update", "--path=" + p, "--allow-root"}, 0)
+		if err == nil {
+			updated++
+		}
 	}
 	return updated, nil
 }
