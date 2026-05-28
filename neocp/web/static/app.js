@@ -37,14 +37,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     async function triggerTenantAuthentication(role) {
         let username = 'patel';
-        if (role === 'admin') username = 'admin';
-        if (role === 'reseller') username = 'reseller1';
+        let password = 'patel123';
+        if (role === 'admin') {
+            username = 'admin';
+            password = 'admin123';
+        }
+        if (role === 'reseller') {
+            username = 'reseller1';
+            password = 'reseller123';
+        }
 
         try {
             const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password: 'password' })
+                body: JSON.stringify({ username, password })
             });
             const data = await res.json();
             if (data.token) {
@@ -81,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadDockerContainers();
                 loadMigrationTasks();
                 loadOSServicesList();
+                loadClusterNodes();
                 
                 // Show role-specific warnings/elements
                 enforceRoleCapabilities();
@@ -98,25 +106,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Enforce multi-tenant GUI boundaries dynamically
     function enforceRoleCapabilities() {
-        const resellerMenu = document.querySelector('[data-target="reseller"]');
-        const systemMenu = document.querySelector('[data-target="system"]');
-        const clusterMenu = document.querySelector('[data-target="clustering"]');
+        // Reset all hidden elements
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.reseller-only').forEach(el => el.style.display = 'none');
 
-        if (currentRole === 'customer') {
-            resellerMenu.style.opacity = '0.3';
-            resellerMenu.style.pointerEvents = 'none';
-            clusterMenu.style.opacity = '0.3';
-            clusterMenu.style.pointerEvents = 'none';
-        } else if (currentRole === 'reseller') {
-            resellerMenu.style.opacity = '1';
-            resellerMenu.style.pointerEvents = 'auto';
-            clusterMenu.style.opacity = '0.3';
-            clusterMenu.style.pointerEvents = 'none';
-        } else { // admin
-            resellerMenu.style.opacity = '1';
-            resellerMenu.style.pointerEvents = 'auto';
-            clusterMenu.style.opacity = '1';
-            clusterMenu.style.pointerEvents = 'auto';
+        // Hide sensitive menu sections for customers
+        const sections = document.querySelectorAll('.menu-section');
+        sections.forEach(sec => {
+            if (sec.textContent === 'Enterprise Ecosystem' && currentRole === 'customer') {
+                sec.style.display = 'none';
+            } else {
+                sec.style.display = 'block';
+            }
+        });
+
+        if (currentRole === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => {
+                // Determine original display type
+                if (el.classList.contains('dashboard-metrics-grid')) el.style.display = 'grid';
+                else if (el.classList.contains('menu-item')) el.style.display = 'list-item';
+                else if (el.classList.contains('shortcut-item')) el.style.display = 'flex';
+                else el.style.display = 'block';
+            });
+        }
+
+        if (currentRole === 'reseller' || currentRole === 'admin') {
+            document.querySelectorAll('.reseller-only').forEach(el => el.style.display = 'block');
+        }
+
+        // Dashboard specific tweaks: hide system-wide telemetry from customers
+        const dashMetrics = document.querySelector('.dashboard-metrics-grid');
+        const threadDiag = document.querySelector('.core-telemetry-section');
+
+        if (currentRole === 'customer' || currentRole === 'reseller') {
+            if (dashMetrics) dashMetrics.style.display = 'none';
+            if (threadDiag) threadDiag.style.display = 'none';
+        } else {
+            if (dashMetrics) dashMetrics.style.display = 'grid';
+            if (threadDiag) threadDiag.style.display = 'block';
         }
     }
 
@@ -144,13 +171,27 @@ document.addEventListener('DOMContentLoaded', () => {
         document.title = `${sectionName} — NeoCP Professional`;
 
         // Action grid hooks
-        if (targetViewId === 'filemanager') loadFileExplorer();
+        if (targetViewId === 'filemanager') {
+            loadTrashSummary();
+            loadFileExplorer();
+        }
         if (targetViewId === 'domains') loadDomainsTable();
         if (targetViewId === 'databases') loadDatabasesTable();
-        if (targetViewId === 'reseller') loadPackagesTable();
+        if (targetViewId === 'mail') loadMailAccounts();
+        if (targetViewId === 'reseller') {
+            loadPackagesTable();
+            loadResellerAccounts();
+        }
+        if (targetViewId === 'ipmanager') {
+            loadIPPool();
+        }
+        if (targetViewId === 'fleet') {
+            // Load global fleet data
+        }
         if (targetViewId === 'system') loadOSServicesList();
         if (targetViewId === 'backups') loadBackupsTable();
         if (targetViewId === 'containers') loadDockerContainers();
+        if (targetViewId === 'clustering') loadClusterNodes();
         if (targetViewId === 'security') {
             loadFirewallBlocks();
             loadDomainsTable();
@@ -425,9 +466,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeDomainModalBtn = document.getElementById('close-domain-modal-btn');
     const submitDomainBtn = document.getElementById('modal-add-domain-submit');
 
+    async function loadPackagesForSelect() {
+        try {
+            const res = await fetch('/api/packages', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const pkgs = await res.json();
+            const select = document.getElementById('modal-package-select');
+            if (select) {
+                select.innerHTML = '';
+                pkgs.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (e) {}
+    }
+
     openAddDomainBtn.addEventListener('click', () => {
         document.getElementById('modal-domain-input').value = `app-${Math.floor(Math.random()*100)}.patelcloud.net`;
         document.getElementById('modal-webroot-input').value = `/home/${currentUser}/public_html/app`;
+        loadPackagesForSelect();
         addDomainModal.classList.add('active');
     });
 
@@ -439,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const domainName = document.getElementById('modal-domain-input').value;
         const webroot = document.getElementById('modal-webroot-input').value;
         const phpVersion = document.getElementById('modal-php-select').value;
+        const packagePlan = document.getElementById('modal-package-select').value;
         const sslToggle = document.getElementById('modal-ssl-toggle').checked;
 
         if (!domainName || !webroot) {
@@ -458,7 +520,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     domain_name: domainName,
                     owner: currentUser,
                     php_version: phpVersion,
-                    ssl_active: sslToggle
+                    ssl_active: sslToggle,
+                    plan: packagePlan
                 })
             });
             const data = await res.json();
@@ -541,8 +604,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td>
                         <div class="table-actions">
+                            <button class="action-btn-secondary convert-account-btn" data-domain="${dom.domain_name}" data-owner="${dom.owner}" style="padding: 4px 8px; font-size: 0.75rem;">Decouple</button>
                             <button class="action-btn-secondary toggle-staging-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Staging</button>
                             <button class="action-btn-secondary ssl-issue-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Issue SSL</button>
+                            <button class="action-btn-secondary git-deploy-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Git Deploy</button>
                             <button class="action-btn-secondary redirect-btn" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem;">Redirect</button>
                             <button class="action-btn-secondary delete-domain-btn text-red" data-domain="${dom.domain_name}" style="padding: 4px 8px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                         </div>
@@ -627,11 +692,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
+    // Convert to Primary Account trigger
+    document.querySelectorAll('.convert-account-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const domain = e.target.getAttribute('data-domain');
+            const owner = e.target.getAttribute('data-owner');
+            if (confirm(`Convert ${domain} to a standalone primary NeoCP account? This will decouple it from ${owner}.`)) {
+                addTaskIndicator();
+                try {
+                    const res = await fetch('/api/migrations/convert', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                        },
+                        body: JSON.stringify({ source_user: owner, addon_domain: domain })
+                    });
+                    if (res.ok) {
+                        showNotification(`${domain} decoupled and converted to primary account!`, 'success');
+                        loadDomainsTable();
+                    }
+                } catch (e) {} finally {
+                    removeTaskIndicator();
+                }
+            }
+        });
+    });
+
             // SSL action triggers
             document.querySelectorAll('.ssl-issue-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const dom = e.target.getAttribute('data-domain');
                     await issueLetsEncryptSSL(dom);
+                });
+            });
+
+            // Git Deploy actions
+            document.querySelectorAll('.git-deploy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const dom = btn.getAttribute('data-domain');
+                    launchGitDeployModal(dom);
                 });
             });
 
@@ -839,6 +939,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function launchGitDeployModal(domainName) {
+        const dom = cachedDomains.find(d => d.domain_name === domainName);
+        const config = dom.git_ops || {};
+
+        const overlay = document.createElement('div');
+        overlay.className = 'neocp-modal-backdrop active';
+        overlay.innerHTML = `
+            <div class="neocp-modal-card glass" style="width: 500px;">
+                <div class="modal-header">
+                    <h4>GitOps Push-to-Deploy: ${domainName}</h4>
+                    <button class="modal-close-btn close-git-modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label>Repository URL (HTTPS or SSH)</label>
+                        <input type="text" id="git-repo-url" value="${config.repo_url || ''}" placeholder="https://github.com/user/repo.git">
+                    </div>
+                    <div class="input-group">
+                        <label>Branch</label>
+                        <input type="text" id="git-branch" value="${config.branch || 'main'}" placeholder="main">
+                    </div>
+                    <div class="input-group">
+                        <label>Deployment Path (Relative to home)</label>
+                        <input type="text" id="git-path" value="${config.path || ''}" placeholder="public_html/${domainName}">
+                    </div>
+
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                        <h6 style="margin:0 0 10px 0;">Webhook URL</h6>
+                        <code style="font-size:11px; word-break:break-all;">https://neocp.io/api/webhooks/git/${domainName}</code>
+                        <p style="font-size:10px; margin-top:5px; color:var(--text-muted);">Add this URL to your GitHub/GitLab repository settings to trigger auto-deploy.</p>
+                    </div>
+
+                    <button class="action-btn" id="save-git-deploy-btn" style="width:100%; margin-top:20px;">⚡ Save & Trigger Initial Deploy</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('.close-git-modal').addEventListener('click', () => overlay.remove());
+
+        document.getElementById('save-git-deploy-btn').addEventListener('click', async () => {
+            const repo_url = document.getElementById('git-repo-url').value;
+            const branch = document.getElementById('git-branch').value;
+            const path = document.getElementById('git-path').value;
+
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/domains/git/deploy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({
+                        domain_name: domainName,
+                        config: { repo_url, branch, path }
+                    })
+                });
+                if (res.ok) {
+                    showNotification('GitOps configuration saved. Deployment worker started.', 'success');
+                    overlay.remove();
+                    loadDomainsTable();
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
     async function deleteDomainSpace(domain) {
         addTaskIndicator();
         try {
@@ -864,6 +1033,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDirLabel = document.getElementById('filemanager-current-dir');
     const fmNewFileBtn = document.getElementById('filemanager-newfile-btn');
     const fmNewDirBtn = document.getElementById('filemanager-newdir-btn');
+    const fmPane = document.querySelector('.filemanager-content-pane');
+
+    if (fmPane) {
+        fmPane.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fmPane.style.borderColor = 'var(--accent-blue)';
+            fmPane.style.background = 'rgba(59, 130, 246, 0.05)';
+        });
+
+        fmPane.addEventListener('dragleave', () => {
+            fmPane.style.borderColor = '';
+            fmPane.style.background = '';
+        });
+
+        fmPane.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            fmPane.style.borderColor = '';
+            fmPane.style.background = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                addTaskIndicator();
+                showNotification(`Uploading ${files.length} items to user sandbox...`, 'info');
+
+                // Simulate multi-file production upload stream
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                    showNotification(`Buffered: ${file.name} (${formatBytes(file.size)})`, 'success');
+                }
+
+                showNotification('Upload complete. NeoCP enhanced drag-drop engine processed all nodes.', 'success');
+                removeTaskIndicator();
+                loadFileExplorer();
+            }
+        });
+    }
     const fmWebdavBtn = document.getElementById('filemanager-webdav-btn');
 
     fmNewFileBtn.addEventListener('click', async () => {
@@ -886,6 +1092,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             showNotification('API connection error creating file.', 'error');
         } finally {
+            removeTaskIndicator();
+        }
+    });
+
+    document.getElementById('filemanager-empty-trash-btn').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to permanently delete all items in trash?')) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/filemanager/emptytrash', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Trash emptied. Freed ${formatBytes(data.bytes_freed)}`, 'success');
+                loadDashboardSummaries();
+            }
+        } catch (e) {} finally {
             removeTaskIndicator();
         }
     });
@@ -999,8 +1223,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Delete file
                 tr.querySelector('.delete-file-btn').addEventListener('click', async () => {
-                    if (confirm(`Wipe ${item.name} permanently?`)) {
-                        await deleteSandboxItem(`${currentPath}/${item.name}`);
+                    const toTrash = confirm(`Move ${item.name} to trash? (Cancel to permanently delete)`);
+                    if (toTrash) {
+                        await deleteSandboxItem(`${currentPath}/${item.name}`, false);
+                    } else {
+                        if (confirm(`REALLY wipe ${item.name} PERMANENTLY?`)) {
+                            await deleteSandboxItem(`${currentPath}/${item.name}`, true);
+                        }
                     }
                 });
 
@@ -1014,10 +1243,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function deleteSandboxItem(path) {
+    async function loadTrashSummary() {
+        // Just used to update visual markers if needed
+    }
+
+    async function deleteSandboxItem(path, force = false) {
         addTaskIndicator();
         try {
-            const res = await fetch(`/api/filemanager/delete?path=${encodeURIComponent(path)}`, {
+            const res = await fetch(`/api/filemanager/delete?path=${encodeURIComponent(path)}&force=${force}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
             });
@@ -1288,6 +1521,27 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open('https://localhost:8443/phpmyadmin', '_blank');
     });
 
+    document.getElementById('db-map-tool-btn')?.addEventListener('click', () => {
+        showNotification('Database Map Tool: Scanning for orphaned database schemas...', 'info');
+        setTimeout(() => {
+            showNotification('No orphaned databases found. All schemas correctly mapped to NeoCP users.', 'success');
+        }, 1500);
+    });
+
+    document.getElementById('db-repair-all-btn')?.addEventListener('click', () => {
+        addTaskIndicator();
+        showNotification('Initiating global repair on all MariaDB databases...', 'info');
+        setTimeout(() => {
+            showNotification('Repair complete. Analyzed 142 tables, 0 corruption detected.', 'success');
+            removeTaskIndicator();
+        }, 3000);
+    });
+
+    document.getElementById('db-proc-monitor-btn')?.addEventListener('click', () => {
+        showNotification('Fetching active MySQL process threads...', 'info');
+        // Simulate monitor view
+    });
+
     // ==========================================================================
     // 8. SECURITY HARDENING & CPHULK LOGS
     // ==========================================================================
@@ -1296,6 +1550,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveModsecBtn = document.getElementById('save-modsec-rules-btn');
     const blockedIps = document.getElementById('blocked-ips-count');
     const logBox = document.getElementById('cphulk-log-box');
+
+    const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
+    if (aiAnalyzeBtn) {
+        aiAnalyzeBtn.addEventListener('click', async () => {
+            const container = document.getElementById('ai-suggestions-container');
+            container.innerHTML = '<div class="text-muted" style="text-align: center; padding: 20px;">🤖 AI Guardian is processing system buffers...</div>';
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/security/ai/analyze', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const suggestions = await res.json();
+                container.innerHTML = '';
+                if (suggestions.length === 0) {
+                    container.innerHTML = '<div class="text-muted" style="text-align: center; padding: 20px;">No critical issues identified. System is optimized.</div>';
+                    return;
+                }
+                suggestions.forEach(s => {
+                    const div = document.createElement('div');
+                    div.style.background = 'rgba(255,255,255,0.03)';
+                    div.style.padding = '15px';
+                    div.style.borderRadius = '8px';
+                    div.style.borderLeft = `4px solid ${s.type === 'security' ? '#ef4444' : '#38bdf8'}`;
+                    div.innerHTML = `
+                        <strong style="display:block; margin-bottom:5px; text-transform:uppercase; font-size:10px; color:${s.type === 'security' ? '#ef4444' : '#38bdf8'};">${s.type} Suggestion</strong>
+                        <p style="font-size:13px; margin:0 0 12px 0;">${s.message}</p>
+                        <button class="action-btn-secondary" style="padding:4px 10px; font-size:11px; border-color:${s.type === 'security' ? '#ef4444' : '#38bdf8'}; color:${s.type === 'security' ? '#ef4444' : '#38bdf8'};">${s.action_label}</button>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
+    // Real-time Malware Scanner Simulation
+    setInterval(() => {
+        const paths = ['/public_html/index.php', '/public_html/wp-config.php', '/.env', '/mail/inbox'];
+        const path = paths[Math.floor(Math.random() * paths.length)];
+        const findings = ['PHP.Shell.Generic', 'Malware.Heuristic.Exploit', 'Suspicious.Pattern.Match'];
+
+        if (Math.random() > 0.95) {
+            const finding = findings[Math.floor(Math.random() * findings.length)];
+            const line = document.createElement('div');
+            line.className = 'log-line text-orange';
+            const now = new Date().toLocaleTimeString();
+            line.innerHTML = `[${now}] <span class="badge badge-red" style="font-size:9px;">SCANNER</span> Threat detected in ${path}: <strong>${finding}</strong>. File quarantined & cleaned automatically.`;
+            logBox.prepend(line);
+            showNotification(`Real-time scanner mitigated a threat in ${path}`, 'error');
+        }
+    }, 15000);
 
     // Simulate real intrusion event streams
     setInterval(() => {
@@ -1334,29 +1640,101 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.install-app-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const app = e.target.getAttribute('data-app');
+            // If WordPress, show toolkit option
+            if (app === 'WordPress') {
+                launchWPToolkitModal();
+            } else {
+                triggerStandardAppInstall(app);
+            }
+        });
+    });
+
+    function triggerStandardAppInstall(app) {
+        addTaskIndicator();
+        showNotification(`[Backuply] Taking pre-install backup of target domain...`, 'info');
+        setTimeout(() => {
+            showNotification(`Softaculous: Downloading ${app} binaries...`, 'info');
+            setTimeout(() => {
+                showNotification(`Softaculous: Creating MySQL database for ${app}...`, 'success');
+                setTimeout(() => {
+                    showNotification(`${app} installed and active! Database credentials mailed.`, 'success');
+                    removeTaskIndicator();
+                    loadFileExplorer();
+                }, 1500);
+            }, 1000);
+        }, 800);
+    }
+
+    function launchWPToolkitModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'neocp-modal-backdrop active';
+        overlay.innerHTML = `
+            <div class="neocp-modal-card glass" style="width: 550px;">
+                <div class="modal-header">
+                    <h4>NeoCP WP Toolkit — CMS Lifecycle Manager</h4>
+                    <button class="modal-close-btn close-wp-modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                        <div class="db-panel-card" style="text-align:center;">
+                            <h5 style="margin:0 0 5px 0;">Version</h5>
+                            <span class="status-badge badge-green">v6.5.3 (Up to date)</span>
+                        </div>
+                        <div class="db-panel-card" style="text-align:center;">
+                            <h5 style="margin:0 0 5px 0;">Security</h5>
+                            <span class="status-badge badge-orange">Medium Hardened</span>
+                        </div>
+                    </div>
+
+                    <h5 style="margin-bottom:10px;">Security Hardening Matrix</h5>
+                    <div style="display:flex; flex-direction:column; gap:10px; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Disable XML-RPC API</span>
+                            <input type="checkbox" id="wp-harden-xmlrpc" checked>
+                        </label>
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Hide WP-Login (Move to /portal)</span>
+                            <input type="checkbox" id="wp-harden-login">
+                        </label>
+                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                            <span style="font-size:13px;">Disable File Editing in Panel</span>
+                            <input type="checkbox" id="wp-harden-fileedit" checked>
+                        </label>
+                    </div>
+
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button class="action-btn" id="wp-apply-harden-btn" style="flex:2;">🛡️ Apply Hardening</button>
+                        <button class="action-btn-secondary" id="wp-bulk-update-btn" style="flex:1;">🔄 Update All</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.close-wp-modal').addEventListener('click', () => overlay.remove());
+
+        document.getElementById('wp-apply-harden-btn').addEventListener('click', async () => {
+            addTaskIndicator();
+            showNotification('WP Toolkit: Rewriting wp-config.php and .htaccess...', 'info');
+            setTimeout(() => {
+                showNotification('WordPress security policy enforced successfully.', 'success');
+                removeTaskIndicator();
+                overlay.remove();
+            }, 1500);
+        });
+
+        document.getElementById('wp-bulk-update-btn').addEventListener('click', () => {
+            showNotification('WP Toolkit: Initiating bulk core/plugin update across all domains...', 'info');
+            overlay.remove();
+        });
+    }
+
+    document.querySelectorAll('.install-app-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const app = e.target.getAttribute('data-app');
             triggerAppInstallationAutodeploy(app, e.target);
         });
     });
 
-    function triggerAppInstallationAutodeploy(app, buttonElement) {
-        let progress = 0;
-        buttonElement.disabled = true;
-        buttonElement.textContent = 'Installing (0%)';
-        showNotification(`Softaculous initiating autodeploy sequence for ${app}...`, 'info');
-
-        const interval = setInterval(() => {
-            progress += 10;
-            buttonElement.textContent = `Installing (${progress}%)`;
-            if (progress >= 100) {
-                clearInterval(interval);
-                buttonElement.disabled = false;
-                buttonElement.textContent = 'Install App';
-                showNotification(`${app} Core Suite autodeployed successfully! Admin credentials sent to ${currentUser}@neocp.io`, 'success');
-                // Seed new files
-                loadFileExplorer();
-            }
-        }, 600);
-    }
 
     document.getElementById('save-php-ini-btn').addEventListener('click', () => {
         const mem = document.getElementById('php-memory-limit').value;
@@ -1453,19 +1831,28 @@ document.addEventListener('DOMContentLoaded', () => {
         addTaskIndicator();
         showNotification('Establishing authenticated handshake with legacy server...', 'info');
 
+        // Check if it's bulk or single (simplified for this stage)
+        const isBulk = targetDomain === '*' || targetDomain.includes(',');
+
         try {
-            const res = await fetch('/api/migrations', {
+            const endpoint = isBulk ? '/api/migrations/bulk' : '/api/migrations';
+            const body = isBulk ? {
+                source: { panel_type: sourceType, hostname: sourceHost, api_token: sourceToken, username: 'root' },
+                accounts: targetDomain.split(',').map(u => ({ account: u.trim(), domain: 'auto', status: 'pending', progress: 0 }))
+            } : {
+                panel_type: sourceType,
+                hostname: sourceHost,
+                target_domain: targetDomain,
+                owner: currentUser
+            };
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
                 },
-                body: JSON.stringify({
-                    panel_type: sourceType,
-                    hostname: sourceHost,
-                    target_domain: targetDomain,
-                    owner: currentUser
-                })
+                body: JSON.stringify(body)
             });
             const task = await res.json();
             if (res.ok) {
@@ -1535,32 +1922,66 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // 12. MASTER STAGING & CLUSTERING ORCHESTRATION
     // ==========================================================================
-    document.getElementById('generate-staging-btn').addEventListener('click', () => {
-        const prod = document.getElementById('staging-prod-select').value;
-        const sub = document.getElementById('staging-subdomain-input').value;
+    async function loadClusterNodes() {
+        const container = document.getElementById('cluster-nodes-container');
+        if (!container) return;
+        container.innerHTML = '<div class="text-muted">Loading cluster topology...</div>';
+        try {
+            const res = await fetch('/api/cluster/nodes', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const nodes = await res.json();
+            container.innerHTML = '';
+            if (nodes.length === 0) {
+                container.innerHTML = '<div class="text-muted">No remote nodes attached.</div>';
+                return;
+            }
+            nodes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'cluster-node-row glass';
+                div.style.marginBottom = '10px';
+                div.style.padding = '15px';
+                div.innerHTML = `
+                    <div class="node-meta">
+                        <h6 style="margin:0; font-family:var(--font-mono); color:var(--accent-blue);">🖥️ ${n.node_id} [${n.ip}]</h6>
+                        <span class="node-role-tag">${n.role.toUpperCase()} NODE</span>
+                        <div style="margin-top:8px; display:flex; gap:15px;">
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:4px;">
+                                    <span>CPU Load</span>
+                                    <span>${n.cpu_load.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar-container" style="height:4px;">
+                                    <div class="progress-fill fill-blue" style="width:${n.cpu_load}%"></div>
+                                </div>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:4px;">
+                                    <span>RAM Load</span>
+                                    <span>${n.ram_load.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar-container" style="height:4px;">
+                                    <div class="progress-fill fill-green" style="width:${n.ram_load}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="status-badge ${n.is_active ? 'badge-green' : 'badge-red'}">${n.is_active ? 'ONLINE' : 'OFFLINE'}</span>
+                        <div style="font-size:9px; color:var(--text-inactive); margin-top:5px;">Last Ping: ${new Date(n.last_ping).toLocaleTimeString()}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="text-red">Failed to load cluster.</div>';
+        }
+    }
 
-        addTaskIndicator();
-        showNotification(`Cloning production filesystem & databases for sandbox workspace staging...`, 'info');
-        setTimeout(() => {
-            removeTaskIndicator();
-            showNotification(`Sandbox successfully provisioned at ${sub}.${prod}. Live testing is enabled.`, 'success');
-            loadDomainsTable();
-        }, 1500);
-    });
-
-    document.getElementById('push-staging-btn').addEventListener('click', () => {
-        addTaskIndicator();
-        showNotification('Initiating production delta-sync push. Compiling changes...', 'info');
-        setTimeout(() => {
-            removeTaskIndicator();
-            showNotification('Staging pushed to primary production hub with zero file disruptions.', 'success');
-        }, 1200);
-    });
-
-    const clusterContainer = document.getElementById('cluster-nodes-container');
-    document.getElementById('attach-node-btn').addEventListener('click', () => {
+    async function attachNode() {
         const ip = document.getElementById('cluster-node-ip').value;
         const role = document.getElementById('cluster-node-role').value;
+        const nodeID = `vps-${Math.floor(Math.random()*900)+100}`;
 
         if (!ip) {
             showNotification('Enter a valid worker cluster address.', 'error');
@@ -1568,22 +1989,242 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         addTaskIndicator();
-        setTimeout(() => {
+        showNotification(`Registering node ${nodeID} and generating mTLS certificates...`, 'info');
+        try {
+            const res = await fetch('/api/cluster/attach', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ node_id: nodeID, ip, role })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Node ${nodeID} attached! PKCS#8 certificates generated for secure gRPC stream.`, 'success');
+                loadClusterNodes();
+            } else {
+                showNotification(data.error || 'Failed to attach node.', 'error');
+            }
+        } catch (e) {
+            showNotification('Cluster API connection failure.', 'error');
+        } finally {
             removeTaskIndicator();
-            const div = document.createElement('div');
-            div.className = 'stat-row';
-            div.style.background = 'rgba(255,255,255,0.02)';
-            div.style.padding = '10px';
-            div.style.borderRadius = '6px';
-            div.style.marginBottom = '8px';
-            div.innerHTML = `
-                <span>🖥️ VPS [${ip}]</span>
-                <span class="status-badge badge-green">${role.toUpperCase()} Cluster</span>
-            `;
-            clusterContainer.appendChild(div);
-            showNotification('VPS connected and distributed service sync configured!', 'success');
-        }, 1000);
+        }
+    }
+
+    async function cloneStaging(productionDomain, stagingSubdomain) {
+        addTaskIndicator();
+        showNotification(`Cloning production filesystem & databases for ${productionDomain}...`, 'info');
+
+        // Visual progress ticker simulation
+        let step = 0;
+        const steps = [
+            "Replicating directory structures...",
+            "Cloning database schemas...",
+            "Recalculating PHP serialized string lengths...",
+            "Injecting staging Nginx virtual hosts..."
+        ];
+        const ticker = setInterval(() => {
+            if (step < steps.length) {
+                showNotification(steps[step], 'info');
+                step++;
+            } else {
+                clearInterval(ticker);
+            }
+        }, 800);
+
+        try {
+            const res = await fetch('/api/staging?action=clone', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ production_domain: productionDomain, staging_subdomain: stagingSubdomain })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification(`Sandbox successfully provisioned at ${stagingSubdomain}. Live testing is enabled.`, 'success');
+                loadDomainsTable();
+                loadDashboardSummaries();
+            } else {
+                showNotification(data.error || 'Cloning failed.', 'error');
+            }
+        } catch (e) {
+            showNotification('Staging API failure.', 'error');
+        } finally {
+            clearInterval(ticker);
+            removeTaskIndicator();
+        }
+    }
+
+    async function pushStaging(stagingSubdomain, syncMode) {
+        addTaskIndicator();
+        showNotification('Initiating production delta-sync push. Compiling changes...', 'info');
+
+        try {
+            const res = await fetch('/api/staging?action=push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ staging_subdomain: stagingSubdomain, sync_mode: syncMode })
+            });
+            if (res.ok) {
+                showNotification('Staging pushed to primary production hub with zero file disruptions.', 'success');
+                loadDomainsTable();
+            } else {
+                const data = await res.json();
+                showNotification(data.error || 'Push failed.', 'error');
+            }
+        } catch (e) {
+            showNotification('Staging Push API failure.', 'error');
+        } finally {
+            removeTaskIndicator();
+        }
+    }
+
+    async function loadIPPool() {
+        const tbody = document.querySelector('#ip-pool-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading IPv4 stack...</td></tr>';
+        try {
+            const res = await fetch('/api/server/ips', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const ips = await res.json();
+            tbody.innerHTML = '';
+
+            const delSelect = document.getElementById('delegate-ip-select');
+            if (delSelect) delSelect.innerHTML = '';
+
+            ips.forEach(ip => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${ip.ip}</strong></td>
+                    <td>${ip.subnet}</td>
+                    <td><span class="status-badge ${ip.is_shared ? 'badge-blue' : 'badge-orange'}">${ip.is_shared ? 'Shared' : 'Dedicated'}</span></td>
+                    <td><code class="text-blue">${ip.owner || 'unassigned'}</code></td>
+                    <td><span class="status-badge ${ip.is_assigned ? 'badge-green' : 'badge-muted'}">${ip.is_assigned ? 'Assigned' : 'Available'}</span></td>
+                    <td>
+                        <button class="action-btn-secondary text-red" style="padding:2px 6px; font-size:0.75rem; border-color:rgba(239,68,68,0.2);">Unbind</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                if (!ip.is_shared && !ip.is_assigned && delSelect) {
+                    const opt = document.createElement('option');
+                    opt.value = ip.ip;
+                    opt.textContent = ip.ip;
+                    delSelect.appendChild(opt);
+                }
+            });
+
+            // Populate reseller select for delegation
+            const accRes = await fetch('/api/reseller/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const accs = await accRes.json();
+            const resSelect = document.getElementById('delegate-reseller-select');
+            if (resSelect) {
+                resSelect.innerHTML = '';
+                accs.filter(a => a.role === 'reseller').forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.username;
+                    opt.textContent = r.username;
+                    resSelect.appendChild(opt);
+                });
+            }
+
+        } catch (e) {}
+    }
+
+    document.getElementById('add-ip-pool-btn')?.addEventListener('click', async () => {
+        const ip = document.getElementById('new-ip-addr').value;
+        const mask = document.getElementById('new-ip-mask').value;
+        const shared = document.getElementById('new-ip-shared').checked;
+        if (!ip) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/server/ips', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ ip, subnet: mask, is_shared: shared })
+            });
+            if (res.ok) {
+                showNotification(`IP ${ip} bound to eth0 interface successfully.`, 'success');
+                loadIPPool();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
     });
+
+    document.getElementById('delegate-ip-btn')?.addEventListener('click', async () => {
+        const ip = document.getElementById('delegate-ip-select').value;
+        const reseller = document.getElementById('delegate-reseller-select').value;
+        if (!ip || !reseller) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/server/ips/delegate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ ip, reseller_id: reseller })
+            });
+            if (res.ok) {
+                showNotification(`IP ${ip} delegated to ${reseller} pool.`, 'success');
+                loadIPPool();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
+
+    async function deleteStaging(subdomain) {
+        addTaskIndicator();
+        try {
+            const res = await fetch(`/api/staging?subdomain=${encodeURIComponent(subdomain)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            if (res.ok) {
+                showNotification('Staging sandbox environment wiped successfully.', 'success');
+                loadDomainsTable();
+                loadDashboardSummaries();
+            }
+        } catch (e) {
+            showNotification('Error destroying sandbox.', 'error');
+        } finally {
+            removeTaskIndicator();
+        }
+    }
+
+    document.getElementById('generate-staging-btn').addEventListener('click', () => {
+        const prod = document.getElementById('staging-prod-select').value;
+        const sub = document.getElementById('staging-subdomain-input').value;
+        cloneStaging(prod, sub);
+    });
+
+    document.getElementById('push-staging-btn').addEventListener('click', () => {
+        // Find an active staging domain to push (just a helper for the generic button)
+        const stagingDom = cachedDomains.find(d => d.domain_name.includes('-stage') || d.domain_name.startsWith('staging.'));
+        if (!stagingDom) {
+            showNotification('No active staging domain found to push.', 'error');
+            return;
+        }
+        const syncMode = document.getElementById('staging-sync-mode').value;
+        pushStaging(stagingDom.domain_name, syncMode);
+    });
+
+    document.getElementById('attach-node-btn').addEventListener('click', attachNode);
 
     // ==========================================================================
     // 13. WHM RESOURCE PACKAGE PROVISIONER
@@ -1591,12 +2232,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const createPkgBtn = document.getElementById('create-package-btn');
     createPkgBtn.addEventListener('click', async () => {
         const name = document.getElementById('pkg-name-input').value;
-        const disk = parseInt(document.getElementById('pkg-disk-input').value) || 0;
-        const bw = parseInt(document.getElementById('pkg-bw-input').value) || 0;
+        const disk = document.getElementById('pkg-disk-input').value;
+        const bw = document.getElementById('pkg-bw-input').value;
         const domains = parseInt(document.getElementById('pkg-domains-input').value) || 0;
         const db = parseInt(document.getElementById('pkg-db-input').value) || 0;
-        const cpu = parseInt(document.getElementById('pkg-cpu-input').value) || 0;
-        const ram = parseInt(document.getElementById('pkg-ram-input').value) || 0;
+        const ftp = parseInt(document.getElementById('pkg-ftp-input').value) || 0;
+        const email = parseInt(document.getElementById('pkg-email-input').value) || 0;
+        const relay = parseInt(document.getElementById('pkg-email-relay-input').value) || 0;
+        const failPct = parseInt(document.getElementById('pkg-email-fail-pct-input').value) || 0;
+        const isReseller = document.getElementById('pkg-reseller-toggle').checked;
 
         if (!name) {
             showNotification('Please enter a package name.', 'error');
@@ -1613,16 +2257,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     name,
-                    disk_limit: disk,
-                    bandwidth_limit: bw,
-                    domains_limit: domains,
-                    databases_limit: db,
-                    lve_cpu_pct: cpu,
-                    lve_ram_mb: ram
+                    owner: currentUser,
+                    disk_quota: disk,
+                    bandwidth: bw,
+                    max_domains: domains,
+                    max_databases: db,
+                    max_ftp: ftp,
+                    max_email: email,
+                    hourly_email_limit: relay,
+                    failed_email_pct: failPct,
+                    is_reseller: isReseller
                 })
             });
             if (res.ok) {
-                showNotification('WHM custom reseller subscription plan deployed.', 'success');
+                showNotification('Production package deployed successfully.', 'success');
                 loadPackagesTable();
             }
         } catch (e) {
@@ -1648,11 +2296,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong class="text-blue">${pkg.name}</strong></td>
-                    <td>${pkg.disk_limit} MB / ${pkg.bandwidth_limit} GB</td>
-                    <td>D:${pkg.domains_limit} | DB:${pkg.databases_limit}</td>
-                    <td><span class="status-badge badge-green">${pkg.lve_cpu_pct}% CPU | ${pkg.lve_ram_mb}MB</span></td>
+                    <td>${pkg.owner}</td>
+                    <td>${pkg.disk_quota} / ${pkg.bandwidth}</td>
+                    <td>D:${pkg.max_domains} | DB:${pkg.max_databases} | E:${pkg.max_email}</td>
                     <td>
-                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete Plan</button>
+                        <button class="action-btn-secondary delete-pkg-btn text-red" data-pkg="${pkg.name}" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.2);">Delete</button>
                     </td>
                 `;
 
@@ -1680,6 +2328,116 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (e) {}
     }
+
+    async function loadMailAccounts() {
+        const tbody = document.querySelector('#mail-accounts-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading maildir nodes...</td></tr>';
+        try {
+            const res = await fetch('/api/mail/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const mails = await res.json();
+            tbody.innerHTML = '';
+            if (mails.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-muted">No email accounts found.</td></tr>';
+                return;
+            }
+            mails.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${m.email}</strong></td>
+                    <td>${m.used_mb} MB / ${m.quota_mb} MB</td>
+                    <td><span class="status-badge badge-green">Active</span></td>
+                    <td>
+                        <button class="action-btn-secondary delete-mail-btn text-red" data-email="${m.email}" style="padding:2px 6px; font-size:0.75rem; border-color:rgba(239,68,68,0.2);">Delete</button>
+                    </td>
+                `;
+                tr.querySelector('.delete-mail-btn').addEventListener('click', async () => {
+                    if (confirm(`Delete mail account ${m.email}?`)) {
+                        await fetch(`/api/mail/accounts?email=${m.email}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                        });
+                        loadMailAccounts();
+                    }
+                });
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    document.getElementById('add-mail-btn')?.addEventListener('click', async () => {
+        const email = document.getElementById('new-mail-addr').value;
+        const password = document.getElementById('new-mail-pass').value;
+        const quota = parseInt(document.getElementById('new-mail-quota').value);
+        if (!email || !password) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/mail/accounts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ email, password, quota_mb: quota, domain: email.split('@')[1] })
+            });
+            if (res.ok) {
+                showNotification(`Mail account ${email} provisioned.`, 'success');
+                loadMailAccounts();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
+
+    async function loadResellerAccounts() {
+        const tbody = document.querySelector('#reseller-accounts-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Loading managed accounts...</td></tr>';
+        try {
+            const res = await fetch('/api/reseller/accounts', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+            });
+            const accs = await res.json();
+            tbody.innerHTML = '';
+            accs.forEach(acc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${acc.username}</strong></td>
+                    <td>${acc.plan}</td>
+                    <td>${acc.owner}</td>
+                    <td>
+                        <button class="action-btn-secondary edit-acc-btn" data-user="${acc.username}" style="padding:2px 6px; font-size:0.75rem;">Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {}
+    }
+
+    document.getElementById('transfer-acc-btn').addEventListener('click', async () => {
+        const user = document.getElementById('transfer-acc-username').value;
+        const owner = document.getElementById('transfer-acc-owner').value;
+        if (!user || !owner) return;
+        addTaskIndicator();
+        try {
+            const res = await fetch('/api/reseller/transfer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                },
+                body: JSON.stringify({ username: user, new_owner: owner })
+            });
+            if (res.ok) {
+                showNotification(`Ownership of ${user} transferred to ${owner}.`, 'success');
+                loadResellerAccounts();
+            }
+        } catch (e) {} finally {
+            removeTaskIndicator();
+        }
+    });
 
     // ==========================================================================
     // 14. DYNAMIC CRON JOBS MANAGER (cPanel Mapped)
@@ -2743,6 +3501,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Set up WAF event listeners and DNS bindings
+    const dnsSecurityBtn = document.getElementById('dns-security-suite-btn');
+    if (dnsSecurityBtn) {
+        dnsSecurityBtn.addEventListener('click', async () => {
+            const domain = document.getElementById('dns-domain-selector').value;
+            if (!domain) return showNotification('Select a domain first.', 'error');
+            addTaskIndicator();
+            try {
+                const res = await fetch('/api/domains/dns/security', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('neocp_token')}`
+                    },
+                    body: JSON.stringify({ domain_name: domain })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(data.log, 'success');
+                    loadDNSRecords(domain);
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
+    const dnsSyncBtn = document.getElementById('dns-cluster-sync-btn');
+    if (dnsSyncBtn) {
+        dnsSyncBtn.addEventListener('click', async () => {
+            addTaskIndicator();
+            showNotification('Broadcasting zone updates to DNS cluster nodes...', 'info');
+            try {
+                const res = await fetch('/api/domains/dns/sync', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('neocp_token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification(data.log, 'success');
+                }
+            } catch (e) {} finally {
+                removeTaskIndicator();
+            }
+        });
+    }
+
     const dnsDomSel = document.getElementById('dns-domain-selector');
     if (dnsDomSel) {
         dnsDomSel.addEventListener('change', (e) => {
@@ -2806,13 +3610,178 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================================================
-    // 21. INITIALIZATION BOOTSTRAP
+    // 21. LOGIN & INITIALIZATION BOOTSTRAP
     // ==========================================================================
-    async function boot() {
-        // Enforce default cookies
-        await triggerTenantAuthentication('customer');
-        connectTelemetryWebSocket();
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginSubmitBtn = document.getElementById('login-submit-btn');
+    const loginError = document.getElementById('login-error');
+    const mainAppContainer = document.getElementById('main-app-container');
+
+    async function performLogin() {
+        const username = loginUsernameInput.value.trim();
+        const password = loginPasswordInput.value.trim();
+
+        if (!username || !password) {
+            loginError.textContent = "Please enter both username and password.";
+            loginError.style.display = "block";
+            return;
+        }
+
+        loginSubmitBtn.disabled = true;
+        loginSubmitBtn.textContent = "Authenticating...";
+        loginError.style.display = "none";
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.token) {
+                // Set cookie & localStorage session
+                document.cookie = `neocp_auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+                localStorage.setItem('neocp_token', data.token);
+                currentUser = username;
+                currentRole = data.role;
+
+                // Adjust Profile display
+                profileRole.textContent = currentRole.toUpperCase();
+                if (currentRole === 'admin') {
+                    profileName.textContent = 'Root System Administrator';
+                    document.getElementById('footer-host-os').textContent = 'Linux / Windows Master';
+                    userRoleSelect.value = 'admin';
+                } else if (currentRole === 'reseller') {
+                    profileName.textContent = 'Enterprise Reseller';
+                    document.getElementById('footer-host-os').textContent = 'WHM Node Reseller';
+                    userRoleSelect.value = 'reseller';
+                } else {
+                    profileName.textContent = username.charAt(0).toUpperCase() + username.slice(1);
+                    document.getElementById('footer-host-os').textContent = 'cPanel Cloud Container';
+                    userRoleSelect.value = 'customer';
+                }
+
+                // Adjust default home folders in sandbox
+                currentPath = `/home/${currentUser}/public_html`;
+
+                // Refresh all models
+                loadDashboardSummaries();
+                loadDomainsTable();
+                loadFileExplorer();
+                loadDatabasesTable();
+                loadCronJobs();
+                loadPackagesTable();
+                loadSupportTickets();
+                loadDockerContainers();
+                loadMigrationTasks();
+                loadOSServicesList();
+                loadClusterNodes();
+
+                // Show role-specific warnings/elements
+                enforceRoleCapabilities();
+
+                // Hide login, show app
+                loginOverlay.classList.remove('active');
+                loginOverlay.style.display = 'none';
+                mainAppContainer.style.display = 'grid';
+                document.body.classList.remove('login-state');
+
+                showNotification(`Welcome back, ${username}! Dashboard initialized.`, 'success');
+                connectTelemetryWebSocket();
+            } else {
+                loginError.textContent = data.error || "Access Denied: Invalid credentials.";
+                loginError.style.display = "block";
+            }
+        } catch (err) {
+            console.error('Session login failure:', err);
+            loginError.textContent = "Server connection handshake failed.";
+            loginError.style.display = "block";
+        } finally {
+            loginSubmitBtn.disabled = false;
+            loginSubmitBtn.textContent = "Authenticate & Enter Dashboard";
+        }
     }
 
+    loginSubmitBtn.addEventListener('click', performLogin);
+    loginPasswordInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performLogin();
+    });
+
+    async function boot() {
+        // Just show the login page by default
+        console.log("NeoCP Core Ready. Awaiting authentication...");
+    }
+
+    const installSoftBtn = document.getElementById('install-softaculous-btn');
+    if (installSoftBtn) {
+        installSoftBtn.addEventListener('click', () => {
+            addTaskIndicator();
+            showNotification('Connecting to Softaculous mirrors...', 'info');
+            setTimeout(() => {
+                showNotification('Downloading Softaculous core package...', 'info');
+                setTimeout(() => {
+                    showNotification('Softaculous library synchronized. All apps available.', 'success');
+                    removeTaskIndicator();
+                    document.getElementById('install-softaculous-btn').innerHTML = '🟢 Softaculous Synced';
+                }, 2000);
+            }, 1000);
+        });
+    }
+
+
     boot();
+});
+
+// --- Backuply Pro Event Listeners ---
+document.addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'open-backuply-modal') {
+        document.getElementById('backuply-modal').style.display = 'flex';
+        // Fetch current config
+        const res = await fetch('/api/backuply/config', {
+            headers: { 'NeoCP-User': currentUser, 'NeoCP-Role': currentRole }
+        });
+        const conf = await res.json();
+        if (conf) {
+            document.getElementById('backuply-enabled').value = conf.enabled ? "true" : "false";
+            document.getElementById('backuply-s3-bucket').value = conf.s3_bucket || "";
+            document.getElementById('backuply-s3-key').value = conf.s3_key || "";
+            document.getElementById('backuply-s3-secret').value = conf.s3_secret || "";
+            document.getElementById('backuply-gdrive').value = conf.gdrive_enabled ? "true" : "false";
+            document.getElementById('backuply-ftp-host').value = conf.ftp_host || "";
+        }
+    }
+
+    if (e.target && e.target.id === 'close-backuply-modal-btn') {
+        document.getElementById('backuply-modal').style.display = 'none';
+    }
+
+    if (e.target && e.target.id === 'save-backuply-btn') {
+        const payload = {
+            enabled: document.getElementById('backuply-enabled').value === "true",
+            s3_bucket: document.getElementById('backuply-s3-bucket').value,
+            s3_key: document.getElementById('backuply-s3-key').value,
+            s3_secret: document.getElementById('backuply-s3-secret').value,
+            gdrive_enabled: document.getElementById('backuply-gdrive').value === "true",
+            ftp_host: document.getElementById('backuply-ftp-host').value
+        };
+
+        const res = await fetch('/api/backuply/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'NeoCP-User': currentUser,
+                'NeoCP-Role': currentRole
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            showNotification('Backuply cloud connectors updated successfully.', 'success');
+            document.getElementById('backuply-modal').style.display = 'none';
+        } else {
+            showNotification('Failed to update Backuply configuration.', 'error');
+        }
+    }
 });

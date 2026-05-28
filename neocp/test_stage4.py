@@ -24,17 +24,21 @@ def get_token(username, password):
 
 def restart_server():
     print("[TEST] Restarting NeoCP server daemon to refresh database state...")
-    # Kill any existing running server on Windows
-    os.system("taskkill /f /im neocp.exe >nul 2>&1")
+    # Kill any existing running server
+    if os.name == 'nt':
+        os.system("taskkill /f /im neocp.exe >nul 2>&1")
+    else:
+        os.system("pkill -f neocp.exe > /dev/null 2>&1")
     time.sleep(1.0)
     
     # Start the server in the background
+    exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "neocp.exe")
     try:
         subprocess.Popen(
-            [os.path.abspath("neocp.exe")], 
+            [exe_path],
             stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL,
-            cwd=os.path.abspath(".")
+            cwd=os.path.dirname(os.path.abspath(__file__))
         )
         print("[TEST] Server daemon spawned in the background.")
         time.sleep(2.0) # wait for binding
@@ -96,8 +100,8 @@ def test_dns_records(token):
         sys.exit(1)
 
     # 3. Check physical BIND9 zone file
-    zone_file_path = os.path.join("dns_zones", f"{domain}.db")
-    assert os.path.exists(zone_file_path), "BIND9 zone file was not written!"
+    zone_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dns_zones", f"{domain}.db")
+    assert os.path.exists(zone_file_path), f"BIND9 zone file was not written at {zone_file_path}!"
     with open(zone_file_path, "r") as f:
         zone_content = f.read()
         print(f"[TEST] BIND9 zone file verified successfully. Length: {len(zone_content)}")
@@ -171,8 +175,8 @@ def test_waf_policy_and_nginx(token):
         sys.exit(1)
 
     # 2. Check Nginx configuration file
-    nginx_conf_path = os.path.join("nginx_vhosts", f"{domain}.conf")
-    assert os.path.exists(nginx_conf_path), "Nginx Virtual Host configuration file was not written!"
+    nginx_conf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nginx_vhosts", f"{domain}.conf")
+    assert os.path.exists(nginx_conf_path), f"Nginx Virtual Host configuration file was not written at {nginx_conf_path}!"
     with open(nginx_conf_path, "r") as f:
         conf_content = f.read()
         print(f"[TEST] Nginx config verified. Length: {len(conf_content)}")
@@ -287,8 +291,8 @@ if __name__ == "__main__":
     # Ensure server is running and clean
     restart_server()
     
-    admin_token = get_token("admin", "password")
-    user_token = get_token("patel", "password")
+    admin_token = get_token("admin", "admin123")
+    user_token = get_token("patel", "patel123")
     
     test_dns_records(user_token)
     test_waf_policy_and_nginx(user_token)

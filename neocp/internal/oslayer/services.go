@@ -113,7 +113,6 @@ func (r *ServiceRegistry) RestartService(serviceName string) error {
 		svc.IsRunning = false
 		r.mu.Unlock()
 		// Small delay representing real service recycle
-		time.Sleep(450 * time.Millisecond)
 		r.mu.Lock()
 		svc.IsRunning = true
 		svc.PID = rand.Intn(20000) + 1000

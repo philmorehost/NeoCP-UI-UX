@@ -2,98 +2,84 @@
   "accounts": {
     "admin": {
       "username": "admin",
-      "password": "password",
+      "password": "admin123",
       "role": "admin",
+      "owner": "root",
       "plan": "Unlimited System Plan",
       "email": "admin@neocp.io",
       "disk_used": 1024,
-      "disk_limit": 0,
+      "disk_limit": -1,
       "bandwidth_used": 45,
-      "bandwidth_limit": 0,
+      "bandwidth_limit": -1,
       "domains_used": 3,
-      "domains_limit": 0,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "domains_limit": -1,
+      "databases_used": 0,
+      "databases_limit": -1,
+      "ftp_used": 0,
+      "ftp_limit": -1,
+      "email_used": 0,
+      "email_limit": -1,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T17:22:55.257056298Z"
     },
     "patel": {
       "username": "patel",
-      "password": "password",
+      "password": "patel123",
       "role": "customer",
+      "owner": "reseller1",
       "plan": "Standard Hosting Plan",
       "email": "a.patel@digitalneo.net",
-      "disk_used": 2,
+      "disk_used": 120,
       "disk_limit": 5000,
       "bandwidth_used": 4,
       "bandwidth_limit": 100,
       "domains_used": 2,
       "domains_limit": 10,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "databases_used": 0,
+      "databases_limit": 5,
+      "ftp_used": 0,
+      "ftp_limit": 5,
+      "email_used": 0,
+      "email_limit": 10,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T17:22:55.257057857Z"
     },
     "reseller1": {
       "username": "reseller1",
-      "password": "password",
+      "password": "reseller123",
       "role": "reseller",
+      "owner": "admin",
       "plan": "Gold Reseller Pack",
       "email": "reseller@neocp.io",
       "disk_used": 240,
       "disk_limit": 50000,
       "bandwidth_used": 15,
       "bandwidth_limit": 2000,
-      "domains_used": 2,
+      "domains_used": 1,
       "domains_limit": 50,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "databases_used": 0,
+      "databases_limit": 100,
+      "ftp_used": 0,
+      "ftp_limit": 100,
+      "email_used": 0,
+      "email_limit": 100,
+      "shared_ip": "192.168.1.100",
+      "dedicated_ip": "",
+      "nameservers": null,
+      "locale": "",
+      "shell_access": false,
+      "created_at": "2026-05-22T17:22:55.257057471Z"
     }
   },
   "domains": {
-    "afan.pmhserver.name.ng": {
-      "domain_name": "afan.pmhserver.name.ng",
-      "owner": "admin",
-      "php_version": "8.2",
-      "directory_privacy": false,
-      "directory_privacy_user": "",
-      "directory_privacy_pass": "",
-      "redirect_url": "",
-      "ssl_active": true,
-      "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "0001-01-01T00:00:00Z",
-      "webdav_enabled": false,
-      "hotlink_protected": false,
-      "leech_protected": false,
-      "gzip_enabled": true,
-      "brotli_enabled": false,
-      "dns_records": null,
-      "waf_policy": {
-        "sqli_shield": false,
-        "xss_block": false,
-        "lfi_shield": false,
-        "csrf_header": false
-      },
-      "created_at": "2026-05-20T08:35:36.931485+01:00"
-    },
-    "app-67.patelcloud.net": {
-      "domain_name": "app-67.patelcloud.net",
-      "owner": "reseller1",
-      "php_version": "8.2",
-      "directory_privacy": false,
-      "directory_privacy_user": "",
-      "directory_privacy_pass": "",
-      "redirect_url": "",
-      "ssl_active": false,
-      "ssl_issuer": "",
-      "ssl_expires": "0001-01-01T00:00:00Z",
-      "webdav_enabled": false,
-      "hotlink_protected": false,
-      "leech_protected": false,
-      "gzip_enabled": true,
-      "brotli_enabled": false,
-      "dns_records": null,
-      "waf_policy": {
-        "sqli_shield": false,
-        "xss_block": false,
-        "lfi_shield": false,
-        "csrf_header": false
-      },
-      "created_at": "2026-05-20T11:44:16.4791129+01:00"
-    },
     "blog.digitalneo.net": {
       "domain_name": "blog.digitalneo.net",
       "owner": "patel",
@@ -104,20 +90,29 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-08-20T10:08:31.9382532+01:00",
+      "ssl_expires": "2026-08-06T17:22:55.257058036Z",
       "webdav_enabled": false,
       "hotlink_protected": false,
       "leech_protected": false,
       "gzip_enabled": true,
       "brotli_enabled": false,
-      "dns_records": [],
+      "dns_records": null,
       "waf_policy": {
-        "sqli_shield": true,
-        "xss_block": true,
-        "lfi_shield": true,
-        "csrf_header": true
+        "sqli_shield": false,
+        "xss_block": false,
+        "lfi_shield": false,
+        "csrf_header": false
       },
-      "created_at": "2026-04-20T08:31:21.3693801+01:00"
+      "git_ops": {
+        "repo_url": "",
+        "branch": "",
+        "path": "",
+        "ssh_key_name": "",
+        "webhook_id": "",
+        "last_deploy": "0001-01-01T00:00:00Z",
+        "deploy_log": null
+      },
+      "created_at": "2026-04-22T17:22:55.257109487Z"
     },
     "shop.digitalneo.net": {
       "domain_name": "shop.digitalneo.net",
@@ -129,7 +124,7 @@
       "redirect_url": "",
       "ssl_active": true,
       "ssl_issuer": "Let's Encrypt Authority X3",
-      "ssl_expires": "2026-07-18T08:31:21.3693801+01:00",
+      "ssl_expires": "2026-07-20T17:22:55.257119476Z",
       "webdav_enabled": true,
       "hotlink_protected": false,
       "leech_protected": false,
@@ -142,7 +137,16 @@
         "lfi_shield": false,
         "csrf_header": false
       },
-      "created_at": "2026-05-10T08:31:21.3693801+01:00"
+      "git_ops": {
+        "repo_url": "",
+        "branch": "",
+        "path": "",
+        "ssh_key_name": "",
+        "webhook_id": "",
+        "last_deploy": "0001-01-01T00:00:00Z",
+        "deploy_log": null
+      },
+      "created_at": "2026-05-12T17:22:55.257119669Z"
     }
   },
   "databases": {
@@ -152,9 +156,10 @@
       "db_user": "patel_wpuser",
       "password": "dbpassword123",
       "remote_ips": "%",
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-22T17:22:55.257120624Z"
     }
   },
+  "mail_accounts": {},
   "cron_jobs": {
     "cron_1": {
       "id": "cron_1",
@@ -163,39 +168,75 @@
       "command": "php /home/patel/public_html/wp-cron.php",
       "schedule": "*/15 * * * *",
       "active": true,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "created_at": "2026-05-22T17:22:55.257121081Z"
+    },
+    "cron_system_scan": {
+      "id": "cron_system_scan",
+      "owner": "admin",
+      "task_name": "Weekly Full Server Malware Scan",
+      "command": "/usr/local/neocp/bin/scan-server --full",
+      "schedule": "0 3 * * 0",
+      "active": true,
+      "created_at": "2026-05-22T17:22:55.257128225Z"
+    },
+    "cron_trash_purge": {
+      "id": "cron_trash_purge",
+      "owner": "admin",
+      "task_name": "Automatic 30-Day Trash Purge",
+      "command": "/usr/local/neocp/bin/purge-trash --days 30",
+      "schedule": "0 4 * * *",
+      "active": true,
+      "created_at": "2026-05-22T17:22:55.257128403Z"
     }
   },
   "reseller_packages": {
     "Enterprise-Cluster": {
       "name": "Enterprise-Cluster",
-      "disk_limit": 50000,
-      "bandwidth_limit": 1000,
-      "domains_limit": 100,
-      "databases_limit": 250,
+      "owner": "admin",
+      "disk_quota": "50GB",
+      "bandwidth": "1000GB",
+      "max_domains": 100,
+      "max_databases": 250,
+      "max_ftp": 250,
+      "max_email": 500,
+      "max_subdomains": 0,
+      "max_parked_domains": 0,
+      "max_addon_domains": 0,
+      "hourly_email_limit": 1000,
+      "failed_email_pct": 0,
+      "max_email_quota": "",
       "lve_cpu_pct": 100,
       "lve_ram_mb": 2048,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
+      "is_reseller": false,
+      "dedicated_ip": false,
+      "shell_access": false,
+      "cgi_access": false,
+      "digest_auth": false,
+      "created_at": "2026-05-22T17:22:55.257120382Z"
     },
     "Premium-Personal": {
       "name": "Premium-Personal",
-      "disk_limit": 2000,
-      "bandwidth_limit": 50,
-      "domains_limit": 3,
-      "databases_limit": 5,
+      "owner": "admin",
+      "disk_quota": "2GB",
+      "bandwidth": "50GB",
+      "max_domains": 3,
+      "max_databases": 5,
+      "max_ftp": 5,
+      "max_email": 10,
+      "max_subdomains": 0,
+      "max_parked_domains": 0,
+      "max_addon_domains": 0,
+      "hourly_email_limit": 100,
+      "failed_email_pct": 0,
+      "max_email_quota": "",
       "lve_cpu_pct": 50,
       "lve_ram_mb": 512,
-      "created_at": "2026-05-20T08:31:21.3693801+01:00"
-    },
-    "Standard Hosting Plan": {
-      "name": "Standard Hosting Plan",
-      "disk_limit": 5000,
-      "bandwidth_limit": 100,
-      "domains_limit": 2,
-      "databases_limit": 1,
-      "lve_cpu_pct": 50,
-      "lve_ram_mb": 512,
-      "created_at": "2026-05-20T13:27:45.6870569+01:00"
+      "is_reseller": false,
+      "dedicated_ip": false,
+      "shell_access": false,
+      "cgi_access": false,
+      "digest_auth": false,
+      "created_at": "2026-05-22T17:22:55.257119993Z"
     }
   },
   "tickets": {
@@ -209,39 +250,48 @@
         {
           "sender": "patel",
           "message": "Hello team, I would like to migrate my main site from cPanel to NeoCP. Can you guide me on using the UZME tool?",
-          "timestamp": "2026-05-20T06:31:21.3693801+01:00"
+          "timestamp": "2026-05-22T15:22:55.257128525Z"
         },
         {
           "sender": "admin",
           "message": "Hello! The Universal Zero-Downtime Migration Engine (UZME) is fully automated. Simply go to Tools -\u003e Migration, enter your old cPanel credential/root access, and NeoCP will sync all files and databases, and dynamically inject a reverse-proxy so you have zero DNS propagation downtime! Let us know if you need any assistance.",
-          "timestamp": "2026-05-20T07:31:21.3693801+01:00"
+          "timestamp": "2026-05-22T16:22:55.257128666Z"
         }
       ],
-      "created_at": "2026-05-20T06:31:21.3693801+01:00"
+      "created_at": "2026-05-22T15:22:55.257128778Z"
     }
   },
   "docker_containers": {},
-  "migration_tasks": {
-    "mig_8537": {
-      "id": "mig_8537",
-      "owner": "admin",
-      "panel_type": "cpanel",
-      "hostname": "173.208.213.194",
-      "target_domain": "afan.pmhserver.name.ng",
-      "status": "complete",
-      "progress_pct": 100,
-      "logs": [
-        "[UZME] Initializing synchronization worker thread...",
-        "[UZME] Secure API handshake established. Scanning target filesystems and MySQL databases...",
-        "[UZME] Packaging 18,242 files into tar archive at source location...",
-        "[UZME] Downloading public_html tar file block... [====================\u003e] 100% (24.1 MB)",
-        "[UZME] Sync complete. Unpacking directory nodes safely into local customer workspace sandbox...",
-        "[UZME] Migrating database patel_wpblog schemas. Injecting whitelists...",
-        "[UZME] Pipeline complete. Launching dynamic reverse-proxy cutover map on port 80...",
-        "[UZME] Migration completed successfully! DNS cutover stage fully functional."
-      ],
-      "created_at": "2026-05-20T08:35:26.3556211+01:00"
+  "migration_tasks": {},
+  "firewall_blocks": {},
+  "cluster_nodes": {},
+  "ssh_keys": {},
+  "ip_addresses": [
+    {
+      "ip": "192.168.1.100",
+      "subnet": "255.255.255.0",
+      "is_shared": true,
+      "is_assigned": true,
+      "owner": "admin"
+    },
+    {
+      "ip": "192.168.1.101",
+      "subnet": "255.255.255.0",
+      "is_shared": false,
+      "is_assigned": false,
+      "owner": "admin"
     }
-  },
-  "firewall_blocks": {}
+  ],
+  "server": {
+    "hostname": "neocp.professional.server",
+    "nameservers": [
+      "ns1.neocp.io",
+      "ns2.neocp.io"
+    ],
+    "resolvers": [
+      "8.8.8.8",
+      "8.8.4.4"
+    ],
+    "shared_ip": "192.168.1.100"
+  }
 }

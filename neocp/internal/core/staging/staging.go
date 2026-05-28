@@ -239,6 +239,10 @@ func PushStagingToProduction(owner, stagingSubdomain, syncMode, sandboxDir strin
 	if prodDomainName == stagingSubdomain {
 		prodDomainName = strings.Replace(stagingSubdomain, "staging.", "", 1)
 	}
+	// Also check for -test suffix used in our test script
+	if prodDomainName == stagingSubdomain {
+		prodDomainName = strings.Replace(stagingSubdomain, "-test", "", 1)
+	}
 
 	var prodDom *core.Domain
 	for _, d := range domains {
@@ -267,11 +271,15 @@ func PushStagingToProduction(owner, stagingSubdomain, syncMode, sandboxDir strin
 
 	// 2. Perform Pre-Push Backup
 	backupPath := filepath.Join(sandboxDir, owner, "backups")
-	_ = os.MkdirAll(backupPath, 0755)
+	if err := os.MkdirAll(backupPath, 0755); err != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err)
+	}
 	prePushArchive := filepath.Join(backupPath, fmt.Sprintf("prepush_%s_%d.bak", prodDomainName, time.Now().Unix()))
 
 	// Create backup of production files
-	_ = CopyDir(prodPath, prePushArchive)
+	if err := CopyDir(prodPath, prePushArchive); err != nil {
+		return fmt.Errorf("failed to create pre-push backup: %w", err)
+	}
 
 	// 3. Perform Sync actions based on Mode
 	if syncMode == "files" || syncMode == "both" {

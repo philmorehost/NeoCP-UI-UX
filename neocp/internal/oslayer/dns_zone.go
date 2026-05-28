@@ -1,6 +1,11 @@
 package oslayer
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -95,4 +100,35 @@ func RemoveBind9ZoneFile(domainName string, workspaceDir string) error {
 		return os.Remove(filePath)
 	}
 	return nil
+}
+
+// GenerateDKIMKey creates a 2048-bit RSA key for DKIM signing
+func GenerateDKIMKey() (string, string, error) {
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Private Key in PEM
+	privBytes := x509.MarshalPKCS1PrivateKey(privKey)
+	privPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
+
+	// Public Key for DNS (stripped of headers/newlines)
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		return "", "", err
+	}
+	pubBase64 := base64.StdEncoding.EncodeToString(pubBytes)
+
+	return string(privPEM), pubBase64, nil
+}
+
+// GenerateSPFRecord returns a standard SPF record for a domain
+func GenerateSPFRecord(ip string) string {
+	return fmt.Sprintf("v=spf1 ip4:%s +a +mx +include:_spf.google.com ~all", ip)
+}
+
+// GenerateDMARCRecord returns a standard DMARC policy
+func GenerateDMARCRecord(domainName string) string {
+	return fmt.Sprintf("v=DMARC1; p=quarantine; rua=mailto:admin@%s", domainName)
 }

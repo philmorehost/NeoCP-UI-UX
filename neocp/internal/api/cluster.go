@@ -34,7 +34,11 @@ func InitializeClusterCertificates() error {
 	}
 
 	// Generate cluster keys dynamically (Master at 127.0.0.1 and localhost)
-	ca, master, _, err := cluster.GenerateClusterKeys([]string{"127.0.0.1", "localhost"}, []string{"127.0.0.1"})
+	ca, err := cluster.GenerateCA()
+	if err != nil {
+		return err
+	}
+	master, err := cluster.GenerateCert(ca, "neocp-master", []string{"127.0.0.1", "localhost"}, true)
 	if err != nil {
 		return err
 	}
@@ -60,7 +64,6 @@ type ClusterAttachRequest struct {
 
 // HandleCluster REST bindings for panel views
 func HandleCluster(w http.ResponseWriter, r *http.Request) {
-	username := r.Header.Get("NeoCP-User")
 	role := r.Header.Get("NeoCP-Role")
 	isAdmin := (role == "admin")
 
@@ -100,7 +103,7 @@ func HandleCluster(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Generate dynamic certificate pair for this specific worker node IP
-		_, _, workerPair, err := cluster.GenerateClusterKeys([]string{"127.0.0.1"}, []string{req.IP})
+		workerPair, err := cluster.GenerateCert(caKeyPair, "neocp-worker", []string{req.IP}, false)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Failed to generate client cert: %s", err)})

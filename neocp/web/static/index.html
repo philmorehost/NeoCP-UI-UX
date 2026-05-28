@@ -10,9 +10,40 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="login-state">
 
-    <div class="neocp-app-grid">
+    <!-- ================= LOGIN OVERLAY ================= -->
+    <div id="login-overlay" class="neocp-modal-backdrop active" style="background-color: var(--bg-main);">
+        <div class="neocp-modal-card glass brushed-steel" style="width: 400px; padding: 40px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <span class="logo-icon" style="font-size: 3rem;">▲</span>
+                <h2 class="logo-text" style="font-size: 2rem; margin-top: 10px;">NEO<span>CP</span></h2>
+                <p class="text-muted" style="font-size: 0.9rem; margin-top: 5px;">Professional Web Hosting Control Panel</p>
+            </div>
+
+            <div id="login-error" class="status-badge badge-red" style="display: none; width: 100%; margin-bottom: 20px; text-align: center; padding: 10px;">
+                Invalid credentials. Access Denied.
+            </div>
+
+            <div class="input-group" style="margin-bottom: 20px;">
+                <label>Username</label>
+                <input type="text" id="login-username" placeholder="e.g. admin" style="width: 100%;">
+            </div>
+            <div class="input-group" style="margin-bottom: 30px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" style="width: 100%;">
+            </div>
+
+            <button id="login-submit-btn" class="action-btn" style="width: 100%; padding: 15px; font-size: 1rem;">Authenticate & Enter Dashboard</button>
+
+            <div style="margin-top: 25px; text-align: center; font-size: 0.75rem; color: var(--text-inactive);">
+                <p>Default Multi-Tenant Access:</p>
+                <p style="margin-top: 5px;">admin / admin123 | reseller1 / reseller123 | patel / patel123</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="neocp-app-grid" id="main-app-container" style="display: none;">
         
         <!-- ================= SIDEBAR NAVIGATION ================= -->
         <aside class="neocp-sidebar">
@@ -52,6 +83,9 @@
                     <li class="menu-item" data-target="databases">
                         <span class="item-icon">🗄️</span> Databases Core
                     </li>
+                    <li class="menu-item" data-target="mail">
+                        <span class="item-icon">📧</span> Email & FTP
+                    </li>
                     <li class="menu-item" data-target="backups">
                         <span class="item-icon">💾</span> Backup Manager
                     </li>
@@ -68,8 +102,14 @@
                     <li class="menu-item" data-target="software">
                         <span class="item-icon">📦</span> Softaculous & Apps
                     </li>
-                    <li class="menu-item" data-target="system">
+                    <li class="menu-item admin-only" data-target="system">
                         <span class="item-icon">📈</span> Telemetry & Processes
+                    </li>
+                    <li class="menu-item admin-only" data-target="ipmanager">
+                        <span class="item-icon">🌐</span> IP Delegation
+                    </li>
+                    <li class="menu-item admin-only" data-target="fleet">
+                        <span class="item-icon">📡</span> Fleet Command
                     </li>
                 </ul>
 
@@ -78,13 +118,13 @@
                     <li class="menu-item" data-target="migration">
                         <span class="item-icon">🚀</span> UZME Migration Engine
                     </li>
-                    <li class="menu-item" data-target="clustering">
+                    <li class="menu-item admin-only" data-target="clustering">
                         <span class="item-icon">🔄</span> Staging & Clustering
                     </li>
                     <li class="menu-item" data-target="reseller">
-                        <span class="item-icon">🏢</span> Reseller Master
+                        <span class="item-icon">🏢</span> Reseller Center
                     </li>
-                    <li class="menu-item" data-target="terminal">
+                    <li class="menu-item admin-only" data-target="terminal">
                         <span class="item-icon">💻</span> Visual Web Terminal
                     </li>
                 </ul>
@@ -148,7 +188,7 @@
                 
                 <!-- VIEW 1: DASHBOARD OVERVIEW -->
                 <div class="viewport-view active" id="view-dashboard">
-                    <div class="dashboard-metrics-grid">
+                    <div class="dashboard-metrics-grid admin-only">
                         <div class="metric-card glass">
                             <div class="metric-header">
                                 <h3>Overall CPU Load</h3>
@@ -193,7 +233,7 @@
                     </div>
 
                     <!-- 8-Core Live Tracking Array -->
-                    <div class="core-telemetry-section glass">
+                    <div class="core-telemetry-section glass admin-only">
                         <div class="section-title-wrapper">
                             <h4>8-Core Processors Thread Diagnostics</h4>
                             <span class="telemetry-live-label"><span class="pulse-dot"></span> WebSockets Stream (1000ms)</span>
@@ -228,7 +268,7 @@
                                     <span class="shortcut-icon">🚀</span>
                                     <span>Migrate Server</span>
                                 </button>
-                                <button class="shortcut-item" data-target="terminal">
+                                <button class="shortcut-item admin-only" data-target="terminal">
                                     <span class="shortcut-icon">💻</span>
                                     <span>Root Terminal</span>
                                 </button>
@@ -343,11 +383,15 @@
                     <div class="domains-list-card glass" style="margin-top: 25px;">
                         <div class="view-header-bar" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 20px;">
                             <h4>DNS Zone File Editor (BIND9 Compiler)</h4>
-                            <div class="input-inline" style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-size: 13px; color: rgba(255,255,255,0.7);">Active Domain Zone:</span>
-                                <select id="dns-domain-selector" class="role-selector" style="width: auto; padding: 6px 12px; height: auto;">
-                                    <option value="">-- Choose Domain --</option>
-                                </select>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <button class="action-btn-secondary admin-only" id="dns-security-suite-btn" style="padding: 6px 12px; font-size:12px;">🛡️ Enable DKIM/SPF/DMARC</button>
+                                <button class="action-btn-secondary admin-only" id="dns-cluster-sync-btn" style="padding: 6px 12px; font-size:12px;">🔄 Sync Cluster</button>
+                                <div class="input-inline" style="display: flex; align-items: center; gap: 10px; margin:0;">
+                                    <span style="font-size: 13px; color: rgba(255,255,255,0.7);">Active Domain Zone:</span>
+                                    <select id="dns-domain-selector" class="role-selector" style="width: auto; padding: 6px 12px; height: auto;">
+                                        <option value="">-- Choose Domain --</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         
@@ -419,6 +463,7 @@
                     <div class="view-header-bar">
                         <h3>Interactive Web File Explorer</h3>
                         <div class="header-button-group">
+                            <button class="action-btn-secondary" id="filemanager-empty-trash-btn">🗑️ Empty Trash</button>
                             <button class="action-btn-secondary" id="filemanager-newfile-btn">+ New File</button>
                             <button class="action-btn-secondary" id="filemanager-newdir-btn">+ New Folder</button>
                             <button class="action-btn" id="filemanager-webdav-btn">WebDAV: Off</button>
@@ -491,7 +536,18 @@
                                 <div class="db-panel-card">
                                     <h5>Quick Admin Access</h5>
                                     <p>Run administrative operations on database schemas, tables, and permissions instantly.</p>
-                                    <button class="action-btn-w-100" id="open-phpmyadmin-btn">⚡ Launch phpMyAdmin Interface</button>
+                                    <div style="display:flex; gap:10px;">
+                                        <button class="action-btn" id="open-phpmyadmin-btn" style="flex:1;">⚡ Launch phpMyAdmin</button>
+                                        <button class="action-btn-secondary admin-only" id="db-map-tool-btn" style="flex:1;">🗺️ Database Map Tool</button>
+                                    </div>
+                                </div>
+                                <div class="db-panel-card admin-only">
+                                    <h5>System Maintenance</h5>
+                                    <p>Repair corruption or monitor active MySQL process threads.</p>
+                                    <div style="display:flex; gap:10px;">
+                                        <button class="action-btn-secondary" id="db-repair-all-btn">🔧 Repair All Databases</button>
+                                        <button class="action-btn-secondary" id="db-proc-monitor-btn">📊 MySQL Process Monitor</button>
+                                    </div>
                                 </div>
                                 <div class="db-panel-card">
                                     <h5>Remote Database Access Configuration</h5>
@@ -506,10 +562,72 @@
                     </div>
                 </div>
 
+                <!-- VIEW: MAIL & FTP -->
+                <div class="viewport-view" id="view-mail">
+                    <div class="view-header-bar">
+                        <h3>Mail & FTP Administration Suite</h3>
+                    </div>
+
+                    <div class="split-layout-db" style="display:flex; gap:20px;">
+                        <div class="split-card glass" style="flex:2;">
+                            <h4>Active Email Accounts</h4>
+                            <table class="neocp-data-table" id="mail-accounts-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email Address</th>
+                                        <th>Usage / Quota</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="split-card glass" style="flex:1;">
+                            <h4>Create New Email Account</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>Email Address</label>
+                                    <input type="text" id="new-mail-addr" placeholder="e.g. hello@domain.com">
+                                </div>
+                                <div class="input-group">
+                                    <label>Password</label>
+                                    <input type="password" id="new-mail-pass" placeholder="Email secret...">
+                                </div>
+                                <div class="input-group">
+                                    <label>Quota (MB)</label>
+                                    <input type="number" id="new-mail-quota" value="500">
+                                </div>
+                                <button class="action-btn" id="add-mail-btn">Provision Mail Account</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- VIEW 5: SECURITY CENTER -->
                 <div class="viewport-view" id="view-security">
                     <div class="view-header-bar">
                         <h3>Security Center Hardening Console</h3>
+                    </div>
+
+                    <div class="split-card glass admin-only" id="ai-guardian-section" style="margin-bottom: 25px; border: 1px solid rgba(56, 189, 248, 0.2); background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="color: #38bdf8; display:flex; align-items:center; gap:10px;">
+                                <span style="font-size: 20px;">🤖</span> NeoCP AI Guardian — Intelligent Diagnostics
+                            </h4>
+                            <button class="action-btn" id="ai-analyze-btn" style="padding: 8px 15px; font-size:12px; background: #38bdf8; color: #0f172a;">⚡ Scan System Logs</button>
+                        </div>
+                        <p class="meta-desc" style="margin-top: 5px;">AI Guardian analyzes global server logs and suggests proactive security or performance hardening measures.</p>
+
+                        <div id="ai-suggestions-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-top: 20px;">
+                            <!-- Suggestions injected via JS -->
+                            <div class="text-muted" style="text-align: center; padding: 20px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px;">
+                                Click "Scan System Logs" to begin deep-learning diagnostics.
+                            </div>
+                        </div>
                     </div>
 
                     <div class="security-grid">
@@ -684,7 +802,8 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                 <!-- VIEW 6: SOFTWARE & APPS -->
                 <div class="viewport-view" id="view-software">
                     <div class="view-header-bar">
-                        <h3>Softaculous Applications & Runtime Selectors</h3>
+                        <h3>Softaculous Full Suite & Backuply Integration</h3>
+                        <button class="action-btn" id="install-softaculous-btn">⚡ Sync Softaculous Library</button>
                     </div>
 
                     <div class="software-grid">
@@ -709,6 +828,24 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <span class="soft-version">v10.2.5</span>
                                     <button class="action-btn-secondary install-app-btn" data-app="Drupal">Install App</button>
                                 </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">Magento</span>
+                                    <h5>Magento E-com</h5>
+                                    <span class="soft-version">v2.4.7</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="Magento">Install App</button>
+                                </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">PrestaShop</span>
+                                    <h5>PrestaShop</h5>
+                                    <span class="soft-version">v8.1.5</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="PrestaShop">Install App</button>
+                                </div>
+                                <div class="softaculous-item">
+                                    <span class="soft-logo">Laravel</span>
+                                    <h5>Laravel Framework</h5>
+                                    <span class="soft-version">v11.x</span>
+                                    <button class="action-btn-secondary install-app-btn" data-app="Laravel">Install App</button>
+                                </div>
                             </div>
 
                             <h4 style="margin-top: 30px;">Native Language Script Managers</h4>
@@ -722,6 +859,17 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                     <h5>Python WSGI Config</h5>
                                     <p>Orchestrate Django/Flask execution hooks natively.</p>
                                     <button class="action-btn-secondary select-runtime-btn" data-lang="Python">Manage Python</button>
+                                </div>
+                            </div>
+
+                            <h4 style="margin-top: 30px;">Backuply — Cloud Backup Engine</h4>
+                            <div class="db-panel-card" style="background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.2);">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <h5 style="margin:0; color:#3b82f6;">Backuply Pro Active</h5>
+                                        <p style="font-size:12px; margin:5px 0;">Automated backups to AWS S3, Google Drive, and FTP nodes.</p>
+                                    </div>
+                                    <button class="action-btn" id="open-backuply-modal" style="padding: 8px 15px; font-size:12px;">Configure Backuply</button>
                                 </div>
                             </div>
                         </div>
@@ -869,7 +1017,7 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
 
                     <div class="staging-cluster-grid">
                         <!-- Staging Box -->
-                        <div class="split-card glass">
+                        <div class="split-card glass brushed-steel">
                             <h4>1-Click Sandbox Staging Generator</h4>
                             <p class="meta-desc">Instantly clone website directory files and database records to test modifications safely.</p>
                             <div class="input-group">
@@ -899,103 +1047,125 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                         </div>
 
                         <!-- Clustering Box -->
-                        <div class="split-card glass">
+                        <div class="split-card glass brushed-steel">
                             <h4>Multi-Node Cluster Registry Manager</h4>
-                            <p class="meta-desc">Link isolated VPS instances to distribute services globally (Database, Web, Mail Nodes).</p>
-                            <div class="input-group">
-                                <label>Worker Node IP / Address</label>
-                                <input type="text" id="cluster-node-ip" placeholder="e.g. 192.168.10.12">
+                            <p class="meta-desc">Link isolated VPS instances to distribute services globally (Database, Web, Mail Nodes) via mTLS gRPC.</p>
+                            <div class="db-management-panel" style="display: flex; flex-direction: column; gap: 12px;">
+                                <div class="input-group">
+                                    <label>Worker Node IP / Address</label>
+                                    <input type="text" id="cluster-node-ip" placeholder="e.g. 192.168.10.12">
+                                </div>
+                                <div class="input-group">
+                                    <label>Distributed Service Assignment Role</label>
+                                    <select id="cluster-node-role" class="role-selector">
+                                        <option value="db">Dedicated Database Node (MySQL)</option>
+                                        <option value="web">Dedicated Web Routing Node (Nginx)</option>
+                                        <option value="mail">Dedicated Mail Server Node (Exim)</option>
+                                    </select>
+                                </div>
+                                <button class="action-btn" id="attach-node-btn" style="margin-top: 5px;">Attach Cluster Worker Node</button>
                             </div>
-                            <div class="input-group">
-                                <label>Distributed Service Assignment Role</label>
-                                <select id="cluster-node-role" class="role-selector">
-                                    <option value="db">Dedicated Database Node (MySQL)</option>
-                                    <option value="web">Dedicated Web Routing Node (Nginx)</option>
-                                    <option value="mail">Dedicated Mail Server Node (Exim)</option>
-                                </select>
-                            </div>
-                            <button class="action-btn" id="attach-node-btn" style="margin-top: 15px;">Attach Cluster Worker Node</button>
 
-                            <h5 style="margin-top: 25px;">Active Core Clusters Registered</h5>
+                            <h5 style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">Active Core Clusters Topology</h5>
                             <div class="cluster-nodes-list" id="cluster-nodes-container">
                                 <!-- Clusters injected via JS -->
+                                <div class="text-muted" style="text-align: center; padding: 20px;">No remote nodes attached.</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- VIEW 10: RESELLER MASTER -->
-                <div class="viewport-view" id="view-reseller">
+                <!-- VIEW: FLEET COMMAND -->
+                <div class="viewport-view" id="view-fleet">
                     <div class="view-header-bar">
-                        <h3>WHM Master Reseller & WHMCS Sync Manager</h3>
+                        <h3>NeoCP Fleet Command — Global Cluster Analytics</h3>
+                        <button class="action-btn">🔗 Register Remote Cluster</button>
                     </div>
 
-                    <div class="reseller-grid">
-                        <div class="split-card glass">
-                            <h4>WHM Resource Package Provisioner</h4>
-                            <p class="meta-desc">Design customized subscription plans for your resellers and sub-users.</p>
-                            
-                            <div class="input-group">
-                                <label>Package Package Name</label>
-                                <input type="text" id="pkg-name-input" placeholder="e.g. Silver-Pack">
+                    <div class="split-card glass" style="margin-bottom: 25px; border: 1px solid var(--accent-blue); background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(59,130,246,0.05) 100%);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h4 style="color:var(--accent-blue);">US-EAST-1 Cluster (Active)</h4>
+                                <span class="text-muted" style="font-size:12px;">Global Master Endpoint: 45.21.90.111</span>
                             </div>
-                            <div class="ini-grid">
-                                <div class="input-group">
-                                    <label>Disk Capacity Limit (MB)</label>
-                                    <input type="number" id="pkg-disk-input" value="5000">
-                                </div>
-                                <div class="input-group">
-                                    <label>Bandwidth Limit (GB)</label>
-                                    <input type="number" id="pkg-bw-input" value="100">
-                                </div>
-                                <div class="input-group">
-                                    <label>Max Domains</label>
-                                    <input type="number" id="pkg-domains-input" value="10">
-                                </div>
-                                <div class="input-group">
-                                    <label>Max Databases</label>
-                                    <input type="number" id="pkg-db-input" value="10">
-                                </div>
+                            <div style="text-align:right;">
+                                <span class="status-badge badge-green">HEALTHY</span>
+                                <div class="text-muted" style="font-size:10px; margin-top:4px;">14 Workers Connected</div>
                             </div>
-                            
-                            <h5 style="margin-top: 20px;">LVE / Cgroups Resource Throttling</h5>
-                            <div class="ini-grid">
-                                <div class="input-group">
-                                    <label>CPU Limit Allocation (%)</label>
-                                    <input type="number" id="pkg-cpu-input" value="50">
-                                </div>
-                                <div class="input-group">
-                                    <label>Memory (RAM) Limit (MB)</label>
-                                    <input type="number" id="pkg-ram-input" value="1024">
-                                </div>
-                            </div>
-                            <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy WHM Package</button>
                         </div>
-
-                        <!-- Active Packages -->
-                        <div class="split-card glass">
-                            <h4>Registered Billing Portals & WHMCS Active Sync</h4>
-                            <div class="db-panel-card" style="margin-bottom: 25px;">
-                                <h5>WHMCS Provisioning API Hook</h5>
-                                <p class="meta-desc">NeoCP provides an automated provisioning endpoint mapped directly into WHMCS.</p>
-                                <div class="stat-row">
-                                    <span class="stat-label">API Gateway Status:</span>
-                                    <span class="stat-val text-green" id="billing-gateway-status">Active & Bound</span>
-                                </div>
-                                <div class="stat-row">
-                                    <span class="stat-label">Provision API Endpoint:</span>
-                                    <span class="stat-val"><code>/api/v1/billing/provision</code></span>
-                                </div>
+                        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px; margin-top:20px;">
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">🌐</span>
+                                <h5 style="margin:5px 0;">342</h5>
+                                <span class="text-muted" style="font-size:10px;">TOTAL DOMAINS</span>
                             </div>
-                            
-                            <h4>Registered WHM Packages</h4>
-                            <table class="neocp-data-table" id="packages-table">
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">🔋</span>
+                                <h5 style="margin:5px 0;">28%</h5>
+                                <span class="text-muted" style="font-size:10px;">AVG CPU LOAD</span>
+                            </div>
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">📦</span>
+                                <h5 style="margin:5px 0;">1.2 TB</h5>
+                                <span class="text-muted" style="font-size:10px;">DISK ALLOCATED</span>
+                            </div>
+                            <div class="db-panel-card" style="text-align:center;">
+                                <span style="font-size:20px;">💸</span>
+                                <h5 style="margin:5px 0;">$4.2k</h5>
+                                <span class="text-muted" style="font-size:10px;">EST. MRR</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-card glass">
+                        <h4>Fleet-wide Service Integrity</h4>
+                        <table class="neocp-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cluster Region</th>
+                                    <th>Node ID</th>
+                                    <th>Service Health</th>
+                                    <th>Traffic I/O</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>EU-WEST-2 (London)</strong></td>
+                                    <td><code>node-782</code></td>
+                                    <td><span class="status-badge badge-green">Running</span></td>
+                                    <td>45.2 MB/s</td>
+                                    <td><button class="action-btn-secondary" style="padding:4px 8px; font-size:11px;">Remote Console</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AP-SOUTH-1 (Mumbai)</strong></td>
+                                    <td><code>node-104</code></td>
+                                    <td><span class="status-badge badge-red">Latency Alert</span></td>
+                                    <td>1.2 MB/s</td>
+                                    <td><button class="action-btn-secondary" style="padding:4px 8px; font-size:11px;">Analyze Logs</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW: IP MANAGEMENT -->
+                <div class="viewport-view" id="view-ipmanager">
+                    <div class="view-header-bar">
+                        <h3>Enterprise IP Pool & Delegation Manager</h3>
+                    </div>
+
+                    <div class="split-layout-db" style="display:flex; gap:20px;">
+                        <div class="split-card glass" style="flex:2;">
+                            <h4>Active IPv4 Pool</h4>
+                            <table class="neocp-data-table" id="ip-pool-table">
                                 <thead>
                                     <tr>
-                                        <th>Plan Name</th>
-                                        <th>Disk / BW</th>
-                                        <th>Limits</th>
-                                        <th>LVE CPU/RAM</th>
+                                        <th>IP Address</th>
+                                        <th>Subnet</th>
+                                        <th>Type</th>
+                                        <th>Owner / Delegate</th>
+                                        <th>Status</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -1004,6 +1174,154 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                                 </tbody>
                             </table>
                         </div>
+
+                        <div class="split-card glass" style="flex:1;">
+                            <h4>Add New IPv4 to Pool</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>IPv4 Address</label>
+                                    <input type="text" id="new-ip-addr" placeholder="e.g. 192.168.1.105">
+                                </div>
+                                <div class="input-group">
+                                    <label>Netmask</label>
+                                    <input type="text" id="new-ip-mask" value="255.255.255.0">
+                                </div>
+                                <div class="toggle-group-inline">
+                                    <input type="checkbox" id="new-ip-shared">
+                                    <label for="new-ip-shared">Mark as Global Shared IP</label>
+                                </div>
+                                <button class="action-btn" id="add-ip-pool-btn">Bind IP to Interface</button>
+                            </div>
+
+                            <h4 style="margin-top: 30px;">Delegate IP to Reseller</h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="input-group">
+                                    <label>Target IP</label>
+                                    <select id="delegate-ip-select" class="role-selector">
+                                        <!-- Injected via JS -->
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Assign to Reseller</label>
+                                    <select id="delegate-reseller-select" class="role-selector">
+                                        <!-- Injected via JS -->
+                                    </select>
+                                </div>
+                                <button class="action-btn" id="delegate-ip-btn">Finalize Delegation</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 10: RESELLER MASTER -->
+                <div class="viewport-view" id="view-reseller">
+                    <div class="view-header-bar">
+                        <h3>Reseller Center & Package Management</h3>
+                    </div>
+
+                    <div class="reseller-grid">
+                        <!-- Left Block: Package Creator -->
+                        <div class="split-card glass">
+                            <h4>Create New Resource Package</h4>
+                            <div class="input-group">
+                                <label>Package Name</label>
+                                <input type="text" id="pkg-name-input" placeholder="e.g. Pro-Hosting">
+                            </div>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Disk Quota (e.g. 10GB, unlimited)</label>
+                                    <input type="text" id="pkg-disk-input" value="5GB">
+                                </div>
+                                <div class="input-group">
+                                    <label>Monthly Bandwidth (e.g. 100GB, unlimited)</label>
+                                    <input type="text" id="pkg-bw-input" value="100GB">
+                                </div>
+                            </div>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Max Domains</label>
+                                    <input type="number" id="pkg-domains-input" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Max SQL Databases</label>
+                                    <input type="number" id="pkg-db-input" value="10">
+                                </div>
+                            </div>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Max FTP Accounts</label>
+                                    <input type="number" id="pkg-ftp-input" value="10">
+                                </div>
+                                <div class="input-group">
+                                    <label>Max Email Accounts</label>
+                                    <input type="number" id="pkg-email-input" value="10">
+                                </div>
+                            </div>
+                            <div class="ini-grid">
+                                <div class="input-group">
+                                    <label>Hourly Email Relay Limit</label>
+                                    <input type="number" id="pkg-email-relay-input" value="100">
+                                </div>
+                                <div class="input-group">
+                                    <label>Failed Message % Limit</label>
+                                    <input type="number" id="pkg-email-fail-pct-input" value="10">
+                                </div>
+                            </div>
+                            <div class="toggle-group-inline">
+                                <input type="checkbox" id="pkg-reseller-toggle">
+                                <label for="pkg-reseller-toggle">WHMReseller: Automatically elevate to Reseller</label>
+                            </div>
+                            <button class="action-btn" id="create-package-btn" style="margin-top: 20px;">Deploy Package</button>
+                        </div>
+
+                        <!-- Right Block: Account Ownership & Transfer -->
+                        <div class="split-card glass">
+                            <h4>Managed Accounts & Ownership</h4>
+                            <table class="neocp-data-table" id="reseller-accounts-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Plan</th>
+                                        <th>Owner</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+
+                            <h4 style="margin-top: 30px;">Account Ownership Transfer <span class="badge role-admin">Admin</span></h4>
+                            <div class="db-management-panel" style="display:flex; flex-direction:column; gap:10px;">
+                                <div class="input-group">
+                                    <label>Target Account Username</label>
+                                    <input type="text" id="transfer-acc-username" placeholder="patel">
+                                </div>
+                                <div class="input-group">
+                                    <label>New Owner (Admin or Reseller)</label>
+                                    <input type="text" id="transfer-acc-owner" placeholder="reseller2">
+                                </div>
+                                <button class="action-btn" id="transfer-acc-btn">Execute Ownership Transfer</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-card glass" style="margin-top:25px;">
+                        <h4>Registered Packages</h4>
+                        <table class="neocp-data-table" id="packages-table">
+                            <thead>
+                                <tr>
+                                    <th>Plan Name</th>
+                                    <th>Owner</th>
+                                    <th>Disk / BW</th>
+                                    <th>Limits (D/DB/E)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -1171,13 +1489,21 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
                     <label>Target Webroot Directory Path</label>
                     <input type="text" id="modal-webroot-input" placeholder="e.g. /home/patel/public_html">
                 </div>
-                <div class="input-group">
-                    <label>Assigned PHP Engine Version</label>
-                    <select id="modal-php-select" class="role-selector">
-                        <option value="8.3">PHP 8.3 (Standard)</option>
-                        <option value="8.2" selected>PHP 8.2 (Isolated)</option>
-                        <option value="8.1">PHP 8.1 (Legacy)</option>
-                    </select>
+                <div class="ini-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="input-group">
+                        <label>PHP Engine</label>
+                        <select id="modal-php-select" class="role-selector">
+                            <option value="8.3">PHP 8.3 (Standard)</option>
+                            <option value="8.2" selected>PHP 8.2 (Isolated)</option>
+                            <option value="8.1">PHP 8.1 (Legacy)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Assigned Package</label>
+                        <select id="modal-package-select" class="role-selector">
+                            <!-- Injected via JS -->
+                        </select>
+                    </div>
                 </div>
                 <div class="toggle-group-inline">
                     <input type="checkbox" id="modal-ssl-toggle" checked>
@@ -1262,6 +1588,50 @@ SecRule ARGS "@contains <script>" "id:10003,phase:2,deny,status:403,log,msg:'XSS
         </div>
     </div>
 
+    <!-- Backuply Modal -->
+    <div class="neocp-modal-backdrop" id="backuply-modal">
+        <div class="neocp-modal-card glass" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cloud-upload-alt"></i> Backuply Pro — Cloud Connectors</h3>
+                <button class="modal-close-btn" id="close-backuply-modal-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Enable Automated Cloud Sync</label>
+                    <select id="backuply-enabled">
+                        <option value="false">Disabled</option>
+                        <option value="true">Active (Pro)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>AWS S3 Bucket Name</label>
+                    <input type="text" id="backuply-s3-bucket" placeholder="e.g. neocp-backups-production">
+                </div>
+                <div class="form-group" style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label>S3 Key ID</label>
+                        <input type="text" id="backuply-s3-key">
+                    </div>
+                    <div style="flex:1;">
+                        <label>S3 Secret</label>
+                        <input type="password" id="backuply-s3-secret">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Google Drive Integration</label>
+                    <select id="backuply-gdrive">
+                        <option value="false">Disconnected</option>
+                        <option value="true">Linked to NeoCP Workspace</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Remote FTP Node (Offsite)</label>
+                    <input type="text" id="backuply-ftp-host" placeholder="ftp.backup-server.com">
+                </div>
+                <button class="action-btn" id="save-backuply-btn" style="margin-top: 15px; width: 100%;">Save Connector Configuration</button>
+            </div>
+        </div>
+    </div>
     <script src="/static/app.js"></script>
 </body>
 </html>
